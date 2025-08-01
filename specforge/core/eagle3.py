@@ -77,7 +77,7 @@ class OnlineEagle3Model(Eagle3Model):
             device: the device to run the target model, if None, use the input_ids device
 
         Returns:
-            hidden_states: (batch, seq_len, 3*hidden_size)
+            hidden_states: (batch, seq_len-length, 3*hidden_size)
             target: (batch, seq_len, vocab_size)
             loss_mask: (batch, seq_len)
             input_ids: (batch, seq_len)
@@ -193,19 +193,36 @@ class OnlineEagle3Model(Eagle3Model):
         acces = []
         cache_hidden = [[], []]
 
-        for idx in range(self.length):
-            is_last = idx == self.length - 1
-
+        inputs_embeds = self.draft_model.embed_input_ids(input_ids[1 : -self.length])
+        inputs_embeds = inputs_embeds.to(hidden_states.dtype)
+        # 处理第一次tagrget model的hidden-states
+        hidden_states = hidden_states[:, : -self.length, :]
+        for idx in range(self.length - 1, -1, -1):
             # Step 5.1: embed the input ids
-            inputs_embeds = self.draft_model.embed_input_ids(input_ids)
-            inputs_embeds = inputs_embeds.to(hidden_states.dtype)
+            if idx > 0:
+                loss_mask = loss_mask.clone()
+                loss_mask[:, -idx:] = 0
+
+            # Generate casual mask from inputs_embeds
+            batch_size, seq_len, hidden_size = inputs_embeds.shape
+            device = inputs_embeds.device
+            casual_mask = torch.tril(
+                torch.ones(seq_len, seq_len, device=device, dtype=torch.bool)
+            )
+            casual_mask = casual_mask.unsqueeze(0).expand(batch_size, -1, -1)
+            casual_attention_mask = torch.zeros_like(
+                casual_mask, dtype=inputs_embeds.dtype
+            )
+            casual_attention_mask.masked_fill_(
+                ~casual_mask, torch.finfo(inputs_embeds.dtype).min
+            )
 
             # Step 5.2: run the draft model backbone
             hidden_states_out = self.draft_model.backbone(
                 input_embeds=inputs_embeds,
                 hidden_states=hidden_states,
                 cache_hidden=cache_hidden,
-                attention_mask=attention_mask,
+                attention_mask=casual_attention_mask,
                 position_ids=position_ids,
                 use_cache=True,
             )
@@ -222,8 +239,8 @@ class OnlineEagle3Model(Eagle3Model):
                 target_p = nn.Softmax(dim=2)(target_head)
                 target_p = target_p.detach()
 
-            # update hidden states for next step
-            hidden_states = hidden_states_out
+            # 模拟推理时候的forward流程，每次把新生成的hidden拼接上
+            hidden_states = hidden_states_out[:, -1, :]
 
             # Step 5.4: get logits
             logits = self.draft_model.compute_logits(hidden_states)
@@ -246,16 +263,6 @@ class OnlineEagle3Model(Eagle3Model):
                     .item()
                     / (loss_mask.sum().item() + 1e-6)
                 )
-
-            if not is_last:
-                # Step 5.7: we need to update the loss mask
-                input_ids = padding(input_ids, left=False)
-                target = padding(target, left=False)
-                loss_mask = padding(loss_mask, left=False)
-                ind = torch.arange(seq_length, device=attention_mask.device)
-                ind0 = ind[idx:]
-                ind1 = ind[: seq_length - idx]
-                attention_mask[:, :, ind0, ind1] = torch.finfo(attention_mask.dtype).min
         return plosses, vlosses, acces
 
 

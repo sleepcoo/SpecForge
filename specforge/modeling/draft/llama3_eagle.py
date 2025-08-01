@@ -613,15 +613,6 @@ class LlamaForCausalLMEagle3(Eagle3DraftModel):
         position_ids = torch.arange(0, seq_length, dtype=torch.long, device=device)
         position_ids = position_ids.unsqueeze(0).view(-1, seq_length)
 
-        # make attention mask
-        if attention_mask is None:
-            attention_mask = torch.ones(
-                (batch_size, seq_length), dtype=torch.bool, device=hidden_states.device
-            )
-        attention_mask = self._prepare_decoder_attention_mask(
-            attention_mask, (batch_size, seq_length), hidden_states, 0
-        )
-
         # fc
         hidden_states = self.fc(hidden_states)
         hidden_states = self.midlayer(
