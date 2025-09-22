@@ -364,7 +364,7 @@ def main():
     base_url = f"http://localhost:{args.port}"
     client = AsyncOpenAI(base_url=f"{base_url}/v1", api_key="None")
     if args.skip_launch_server:
-        batch_size = 8
+        batch_size = configs[0][0] if len(configs) > 0 else 8
         for bench_name, conversation_list in bench_conversations.items():
             semaphore = asyncio.Semaphore(batch_size)
             start_timestamp = time.perf_counter()

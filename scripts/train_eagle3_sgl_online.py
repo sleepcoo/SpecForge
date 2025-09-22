@@ -543,8 +543,12 @@ class SglOnlineEagle3Trainer:
                         full_path = os.path.join(self.args.output_dir, name)
                         if not os.path.isdir(full_path):
                             continue
-                        dirs.append((step_re.match(name).group(1), full_path))
-                    dirs.sort(key=lambda x: x[0], reverse=True)
+                        match = step_re.match(name)
+                        if match:
+                            dirs.append((match.group(1), full_path))
+                        else:
+                            print(f"Warning: {name} is not a valid step directory")
+                    dirs.sort(key=lambda x: int(x[0]), reverse=True)
                     for i, (_, path) in enumerate(dirs):
                         if i >= self.args.save_total_limit:
                             print(f"Removing {path}")

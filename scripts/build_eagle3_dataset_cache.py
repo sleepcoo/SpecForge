@@ -46,6 +46,7 @@ def view_data(dataset, tokenizer, idx_list):
         input_ids = dataset["input_ids"][idx].view(-1)
         loss_mask = dataset["loss_mask"][idx].view(-1).tolist()
         print(f"Loss mask sum: {sum(loss_mask)}")
+        assert len(input_ids) > 0, "input_ids and loss_mask should not be empty"
         current_mask = input_ids[0]
         current_ids = []
         for i in range(len(input_ids)):
