@@ -376,7 +376,9 @@ def main():
             acc_length = send_get_accept_length_request(base_url)
             send_flush_cache_request(base_url)
             throughput = completion_tokens / duration
-            print(f"bs=8:{bench_name=} {completion_tokens=} {acc_length=} {duration=}s {throughput=} token/s")
+            print(
+                f"bs=8:{bench_name=} {completion_tokens=} {acc_length=} {duration=}s {throughput=} token/s"
+            )
         exit()
 
     for batch_size, steps, topk, num_draft_tokens in configs:

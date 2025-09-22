@@ -146,7 +146,6 @@ def preprocess_conversations(
     else:
         raise ValueError(f"Invalid parser type: {chat_template.parser_type}")
 
-            
     kwargs_list = [{}] * len(conversations)
     for key, value_list in kwargs.items():
         for i, value in enumerate(value_list):

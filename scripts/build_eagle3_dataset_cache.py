@@ -39,6 +39,7 @@ def parse_args():
     args = parser.parse_args()
     return args
 
+
 def view_data(dataset, tokenizer, idx_list):
     RED, GREEN, RESET = "\033[91m", "\033[92m", "\033[0m"
     for idx in idx_list:
@@ -51,16 +52,14 @@ def view_data(dataset, tokenizer, idx_list):
             if current_mask == loss_mask[i]:
                 current_ids.append(input_ids[i])
             else:
-                decoded_text = tokenizer.decode(
-                    current_ids, skip_special_tokens=False
-                )
+                decoded_text = tokenizer.decode(current_ids, skip_special_tokens=False)
                 if current_mask == 0:
                     print(f"{RED}{decoded_text}{RESET}", end="")
                 else:
                     print(f"{GREEN}{decoded_text}{RESET}", end="")
                 current_ids = [input_ids[i]]
                 current_mask = loss_mask[i]
-        
+
         if sum(loss_mask) == 0:
             print(f"{RED}No loss mask{RESET}")
             print(

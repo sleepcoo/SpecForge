@@ -49,7 +49,11 @@ class GeneralParser(Parser):
         )
 
     def parse(
-        self, conversation: "Conversation", max_length: int, preformatted: bool = False, **kwargs
+        self,
+        conversation: "Conversation",
+        max_length: int,
+        preformatted: bool = False,
+        **kwargs,
     ) -> Dict[str, List[torch.Tensor]]:
         if not preformatted:
             messages = []
@@ -77,10 +81,7 @@ class GeneralParser(Parser):
                 messages.append(sentence)
 
             conversation = self.tokenizer.apply_chat_template(
-                messages,
-                tokenize=False,
-                add_generation_prompt=False,
-                **kwargs
+                messages, tokenize=False, add_generation_prompt=False, **kwargs
             )
 
         if not self.tokenizer.pad_token_id:

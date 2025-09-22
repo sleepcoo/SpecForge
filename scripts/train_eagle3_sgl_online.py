@@ -208,7 +208,9 @@ class TrainDataLoaderWrapper:
                     f"Skipping {self.steps_consumed_in_current_epoch} steps in current epoch"
                 )
                 # it takes 5 minutes to run 279310 steps
-                for _ in tqdm(range(self.steps_consumed_in_current_epoch), desc="Skipping steps"):
+                for _ in tqdm(
+                    range(self.steps_consumed_in_current_epoch), desc="Skipping steps"
+                ):
                     next(dataloader)
             for data in dataloader:
                 self.steps_consumed_in_current_epoch += 1
@@ -353,23 +355,17 @@ class SglOnlineEagle3Trainer:
 
     def _create_draft_model(self, param_dtype=torch.bfloat16):
         if self.draft_model_last_checkpoint:
-            draft_model = (
-                AutoEagle3DraftModel.from_pretrained(
-                    self.draft_model_last_checkpoint,
-                    attention_backend=self.args.draft_attention_backend,
-                )
-                .cuda()
-                .to(param_dtype)
-            )
+            draft_model = AutoEagle3DraftModel.from_pretrained(
+                self.draft_model_last_checkpoint,
+                attention_backend=self.args.draft_attention_backend,
+                torch_dtype=param_dtype,
+            ).cuda()
         else:
-            draft_model = (
-                AutoEagle3DraftModel.from_config(
-                    self.draft_model_config,
-                    attention_backend=self.args.draft_attention_backend,
-                )
-                .cuda()
-                .to(param_dtype)
-            )
+            draft_model = AutoEagle3DraftModel.from_config(
+                self.draft_model_config,
+                attention_backend=self.args.draft_attention_backend,
+                torch_dtype=param_dtype,
+            ).cuda()
         draft_model.load_embedding(
             self.args.target_model_path, embedding_key=self.args.embedding_key
         )

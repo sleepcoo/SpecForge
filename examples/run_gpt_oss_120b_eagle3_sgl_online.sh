@@ -109,4 +109,4 @@ CUDA_VISIBLE_DEVICES=4,5,6,7 python3 benchmarks/bench_model_speedup.py \
     --config-list "${config_list[@]}" \
     --attention-backend fa3 \
     --benchmark-list mtbench:80 \
-    --output gpt-oss-120b_Eagle3-300k_result.jsonl --split-category 
+    --output gpt-oss-120b_Eagle3-300k_result.jsonl --split-category
