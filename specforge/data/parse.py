@@ -49,7 +49,7 @@ class GeneralParser(Parser):
         )
 
     def parse(
-        self, conversation: "Conversation", max_length: int, preformatted: bool = False
+        self, conversation: "Conversation", max_length: int, preformatted: bool = False, **kwargs
     ) -> Dict[str, List[torch.Tensor]]:
         if not preformatted:
             messages = []
@@ -63,7 +63,8 @@ class GeneralParser(Parser):
                 )
                 conversation = conversation[1:]
             else:
-                messages.append({"role": "system", "content": self.system_prompt})
+                if self.system_prompt:
+                    messages.append({"role": "system", "content": self.system_prompt})
 
             convroles = ["user", "assistant"]
             for j, sentence in enumerate(conversation):
@@ -73,12 +74,13 @@ class GeneralParser(Parser):
                         f"Conversation truncated due to unexpected role '{role}'. Expected '{convroles[j % 2]}'."
                     )
                     break
-                messages.append({"role": role, "content": sentence["content"]})
+                messages.append(sentence)
 
             conversation = self.tokenizer.apply_chat_template(
                 messages,
                 tokenize=False,
                 add_generation_prompt=False,
+                **kwargs
             )
 
         if not self.tokenizer.pad_token_id:

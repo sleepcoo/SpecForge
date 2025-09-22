@@ -116,6 +116,7 @@ def preprocess_conversations(
     chat_template: ChatTemplate,
     max_length: int = 2048,
     is_preformatted: bool = False,
+    **kwargs,
 ) -> Dict[str, List[torch.Tensor]]:
     """
     Preprocess a batch of ShareGPT style conversations or pre-formatted text.
@@ -145,12 +146,17 @@ def preprocess_conversations(
     else:
         raise ValueError(f"Invalid parser type: {chat_template.parser_type}")
 
-    for source in conversations:
+            
+    kwargs_list = [{}] * len(conversations)
+    for key, value_list in kwargs.items():
+        for i, value in enumerate(value_list):
+            kwargs_list[i][key] = value
+    for source, kwargs_item in zip(conversations, kwargs_list):
         if not source:
             # if the source is None, skip it
             continue
         input_ids, loss_mask = parser.parse(
-            source, max_length, preformatted=is_preformatted
+            source, max_length, preformatted=is_preformatted, **kwargs_item
         )
         results["input_ids"].append(input_ids[None, :])
         results["loss_mask"].append(loss_mask[None, :])
@@ -359,12 +365,16 @@ def build_eagle3_dataset(
                 raise ValueError(
                     f"Expected 'conversations' column for is_preformatted=False, but found columns: {list(examples.keys())}"
                 )
+            conversations = examples.pop("conversations")
+            if "id" in examples:
+                examples.pop("id")
             processed = preprocess_conversations(
                 tokenizer,
-                examples["conversations"],
+                conversations,
                 template,
                 max_length,
                 is_preformatted=False,
+                **examples,
             )
 
         return processed
