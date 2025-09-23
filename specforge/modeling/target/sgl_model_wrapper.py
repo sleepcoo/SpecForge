@@ -132,6 +132,7 @@ class SglangTargetModel(nn.Module):
 
         self.server_args.cuda_graph_max_bs = max(self.bench_args.batch_size)
         self.server_args.cuda_graph_bs = list(self.bench_args.batch_size)
+        self.server_args.quantization =  "w8a8_fp8"
         _set_envs_and_config(self.server_args)
         self.port_args = PortArgs.init_new(self.server_args)
         # Set CPU affinity
