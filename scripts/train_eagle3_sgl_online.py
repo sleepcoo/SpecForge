@@ -741,6 +741,10 @@ class SglOnlineEagle3Trainer:
                         self.tracker.log(train_logdict, step=self.global_batch_idx)
                         self.eval()
 
+        # Save final checkpoint
+        self.save_checkpoint(self.global_batch_idx)
+        print_on_rank0(f"Training completed. Final checkpoint saved at step {self.global_batch_idx}")
+        
         destroy_distributed()
         return
 
