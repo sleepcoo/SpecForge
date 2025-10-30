@@ -225,7 +225,7 @@ class TrainDataLoaderWrapper:
                 ):
                     next(dataloader)
             for data in dataloader:
-                self.steps_consumed_in_current_epoch += 1
+                ·elf.steps_consumed_in_current_epoch += 1
                 self.steps_consumed += 1
                 yield data
             self.steps_consumed_in_current_epoch = 0

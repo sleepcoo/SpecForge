@@ -1,0 +1,9 @@
+from .eagle3_target_model import Eagle3TargetModel, SGLangEagle3TargetModel, HFEagle3TargetModel, CustomEagle3TargetModel, get_eagle3_target_model
+
+__all__ = [
+    "Eagle3TargetModel",
+    "SGLangEagle3TargetModel",
+    "HFEagle3TargetModel",
+    "CustomEagle3TargetModel",
+    "get_eagle3_target_model",
+]

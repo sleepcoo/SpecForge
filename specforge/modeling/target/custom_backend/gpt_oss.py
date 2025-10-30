@@ -40,7 +40,6 @@ from transformers.utils.generic import OutputRecorder, check_model_inputs
 
 from specforge.distributed import get_tp_group
 from specforge.layers.linear import ColumnParallelLinear, RowParallelLinear
-from specforge.modeling.target.base import DistributedTargetModel
 
 
 class GptOssExperts(nn.Module):
@@ -716,7 +715,7 @@ def load_balancing_loss_func(
 
 
 @auto_docstring
-class GptOssForCausalLM(GptOssPreTrainedModel, GenerationMixin, DistributedTargetModel):
+class GptOssForCausalLM(GptOssPreTrainedModel, GenerationMixin):
     _tied_weights_keys = ["lm_head.weight"]
     _tp_plan = {"lm_head": "colwise_rep"}
     _pp_plan = {"lm_head": (["hidden_states"], ["logits"])}
@@ -832,51 +831,6 @@ class GptOssForCausalLM(GptOssPreTrainedModel, GenerationMixin, DistributedTarge
             attentions=outputs.attentions,
             router_logits=outputs.router_logits,
         )
-
-    def load_weights(self, state_dict):
-        tp_group = get_tp_group()
-
-        updated_state_dict = {}
-        for key, value in state_dict.items():
-            # Ensure that the state dict is a flat dict of keys and tensors. Breaking this assumption
-            # will break recipe code
-            if not isinstance(value, torch.Tensor):
-                raise ValueError(
-                    f"Expected all values in the state dict to be torch.Tensor. "
-                    f"Found {type(value)} instead."
-                )
-
-            module_key = ".".join(key.split(".")[:-1])
-            module = self.get_submodule(module_key)
-
-            # get the module type based on key
-            if key.endswith("sinks"):
-                value = self._shard_tensor(value, tp_group, 0)
-            elif key.endswith("experts.gate_up_proj_bias"):
-                value = self._shard_tensor(value, tp_group, -1)
-            elif key.endswith("experts.gate_up_proj"):
-                gate, up = value[:, :, ::2], value[:, :, 1::2]
-
-                # shard the gate and up based on tp
-                gate = self._shard_tensor(gate, tp_group, -1)
-                up = self._shard_tensor(up, tp_group, -1)
-                value = torch.empty_like(gate).repeat(1, 1, 2)
-                value[:, :, ::2] = gate
-                value[:, :, 1::2] = up
-            elif key.endswith("experts.down_proj_bias"):
-                pass
-            elif key.endswith("experts.down_proj"):
-                value = self._shard_tensor(value, tp_group, 1)
-            elif isinstance(module, RowParallelLinear) and key.endswith(".weight"):
-                value = self._shard_tensor(value, tp_group, -1)
-            elif isinstance(module, ColumnParallelLinear) and key.endswith(".weight"):
-                value = self._shard_tensor(value, tp_group, 0)
-            elif isinstance(module, ColumnParallelLinear) and key.endswith(".bias"):
-                value = self._shard_tensor(value, tp_group, 0)
-            updated_state_dict[key] = value
-
-        # load state dict
-        self.load_state_dict(updated_state_dict, strict=False)
 
 
 __all__ = ["GptOssForCausalLM", "GptOssModel", "GptOssPreTrainedModel"]
