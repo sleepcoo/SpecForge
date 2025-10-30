@@ -3,22 +3,21 @@ import hashlib
 import math
 import os
 import time
+from argparse import ArgumentParser, Namespace
+from typing import List, Optional, Tuple
 
 import torch
 import torch.distributed as dist
+import torch.nn as nn
 from accelerate.utils import set_seed
 from datasets import load_dataset
 from torch.distributed.fsdp import FullyShardedDataParallel as FSDP
 from torch.distributed.fsdp import MixedPrecision, ShardingStrategy, StateDictType
+from torch.optim import Optimizer
+from torch.utils.data import DataLoader
 from tqdm import tqdm
 from transformers import AutoProcessor, AutoTokenizer
-from argparse import Namespace, ArgumentParser
-from torch.utils.data import DataLoader
 
-from specforge.modeling.target import (
-    Eagle3TargetModel,
-    get_eagle3_target_model,
-) 
 from specforge import (
     AutoDraftModelConfig,
     AutoEagle3DraftModel,
@@ -30,13 +29,10 @@ from specforge.data import (
     generate_vocab_mapping_file,
     prepare_dp_dataloaders,
 )
-from specforge.distributed import (
-    destroy_distributed,
-    get_dp_group,
-    init_distributed,
-)
+from specforge.distributed import destroy_distributed, get_dp_group, init_distributed
+from specforge.modeling.target import Eagle3TargetModel, get_eagle3_target_model
 from specforge.optimizer import BF16Optimizer
-from specforge.tracker import create_tracker, get_tracker_class
+from specforge.tracker import Tracker, create_tracker, get_tracker_class
 from specforge.utils import (
     create_draft_config_from_target,
     get_last_checkpoint,
@@ -44,10 +40,6 @@ from specforge.utils import (
     print_with_rank,
     rank_0_priority,
 )
-from specforge.tracker import Tracker
-from typing import Tuple, Optional, List
-import torch.nn as nn
-from torch.optim import Optimizer
 
 
 def parse_args() -> Tuple[ArgumentParser, Namespace]:
@@ -201,7 +193,13 @@ def parse_args() -> Tuple[ArgumentParser, Namespace]:
     parser.add_argument("--profile-start-step", type=int, default=30)
     parser.add_argument("--profile-num-steps", type=int, default=4)
     parser.add_argument("--profile-record-shapes", action="store_true")
-    parser.add_argument("--target-model-backend", type=str, default="sglang", choices=["sglang", "hf", "custom"], help="The backend of the target model")
+    parser.add_argument(
+        "--target-model-backend",
+        type=str,
+        default="sglang",
+        choices=["sglang", "hf", "custom"],
+        help="The backend of the target model",
+    )
 
     args = parser.parse_args()
     return parser, args
@@ -227,7 +225,9 @@ def build_tracker(args: Namespace, parser: ArgumentParser) -> Tracker:
     return tracker
 
 
-def build_target_model(args: Namespace, draft_model_config: AutoDraftModelConfig) -> Eagle3TargetModel:
+def build_target_model(
+    args: Namespace, draft_model_config: AutoDraftModelConfig
+) -> Eagle3TargetModel:
     """
     Build the target model according to the arguments.
 
@@ -238,7 +238,11 @@ def build_target_model(args: Namespace, draft_model_config: AutoDraftModelConfig
     Returns:
         The target model.
     """
-    if args.is_vlm and draft_model_config.target_model_type == "qwen2_5_vl" and args.tp_size == 1:
+    if (
+        args.is_vlm
+        and draft_model_config.target_model_type == "qwen2_5_vl"
+        and args.tp_size == 1
+    ):
         from transformers import Qwen2_5_VLForConditionalGeneration
 
         target_model = (
@@ -259,8 +263,14 @@ def build_target_model(args: Namespace, draft_model_config: AutoDraftModelConfig
         )
 
     # set the aux hidden states layers
-    if hasattr(draft_model_config, "eagle_config") and draft_model_config.eagle_config is not None and "eagle_aux_hidden_state_layer_ids" in draft_model_config.eagle_config:
-        target_model.set_aux_hidden_states_layers(draft_model_config.eagle_config["eagle_aux_hidden_state_layer_ids"])
+    if (
+        hasattr(draft_model_config, "eagle_config")
+        and draft_model_config.eagle_config is not None
+        and "eagle_aux_hidden_state_layer_ids" in draft_model_config.eagle_config
+    ):
+        target_model.set_aux_hidden_states_layers(
+            draft_model_config.eagle_config["eagle_aux_hidden_state_layer_ids"]
+        )
     else:
         target_model.set_aux_hidden_states_layers()
 
@@ -287,17 +297,14 @@ def sanity_check(args: Namespace) -> None:
         None
     """
     args.dp_size = dist.get_world_size() // args.tp_size
-    args.draft_accumulation_steps = (
-        args.draft_global_batch_size // args.dp_size
-    )
+    args.draft_accumulation_steps = args.draft_global_batch_size // args.dp_size
     assert (
-        args.draft_accumulation_steps * args.dp_size
-        == args.draft_global_batch_size
+        args.draft_accumulation_steps * args.dp_size == args.draft_global_batch_size
     ), f"draft_global_batch_size={args.draft_global_batch_size} must be divisible by dp_size={args.dp_size}"
     print_with_rank(
         f"draft_accumulation_steps={args.draft_global_batch_size} // {args.dp_size}={args.draft_accumulation_steps}"
     )
-    
+
 
 def build_draft_model(args: Namespace) -> Tuple[AutoDraftModelConfig, nn.Module]:
     # Handle draft model config
@@ -335,10 +342,15 @@ def build_draft_model(args: Namespace) -> Tuple[AutoDraftModelConfig, nn.Module]
     draft_model.freeze_embedding()
     return draft_model_config, draft_model
 
-def build_dataloaders(args: Namespace, draft_model_config: AutoDraftModelConfig, processor: Optional[AutoProcessor] = None) -> Tuple[DataLoader, str, Optional[DataLoader]]:
+
+def build_dataloaders(
+    args: Namespace,
+    draft_model_config: AutoDraftModelConfig,
+    processor: Optional[AutoProcessor] = None,
+) -> Tuple[DataLoader, str, Optional[DataLoader]]:
     # build dataloaders
     tokenizer = AutoTokenizer.from_pretrained(args.target_model_path)
-    
+
     # convert to dataloader
     cache_params_string = (
         f"{args.train_data_path}-"
@@ -376,7 +388,7 @@ def build_dataloaders(args: Namespace, draft_model_config: AutoDraftModelConfig,
         process_group=get_dp_group(),
         is_vlm=args.is_vlm,
     )
-    
+
     if args.eval_data_path is not None:
         eval_dataset = load_dataset("json", data_files=args.eval_data_path)["train"]
         eval_eagle3_dataset = build_eagle3_dataset(
@@ -400,10 +412,20 @@ def build_dataloaders(args: Namespace, draft_model_config: AutoDraftModelConfig,
         print_with_rank("Initialized eval dataloader")
     else:
         eval_dataloader = None
-    return train_dataloader, vocab_mapping_path, eval_dataloader, 
+    return (
+        train_dataloader,
+        vocab_mapping_path,
+        eval_dataloader,
+    )
 
 
-def save_checkpoints(args: Namespace, epoch: int, step: int, eagle3_model: nn.Module, optimizer: Optimizer):
+def save_checkpoints(
+    args: Namespace,
+    epoch: int,
+    step: int,
+    eagle3_model: nn.Module,
+    optimizer: Optimizer,
+):
     epoch_output_dir = os.path.join(args.output_dir, f"epoch_{epoch}_step_{step}")
     if dist.get_rank() == 0:
         os.makedirs(epoch_output_dir, exist_ok=True)
@@ -439,7 +461,13 @@ def save_checkpoints(args: Namespace, epoch: int, step: int, eagle3_model: nn.Mo
         dist.barrier()
 
 
-def run_forward(args: Namespace, eagle3_model: nn.Module, data: dict, target_model: Optional[Eagle3TargetModel] = None, target_head: Optional[nn.Module] = None) -> Tuple[List[torch.Tensor], List[torch.Tensor]]:
+def run_forward(
+    args: Namespace,
+    eagle3_model: nn.Module,
+    data: dict,
+    target_model: Optional[Eagle3TargetModel] = None,
+    target_head: Optional[nn.Module] = None,
+) -> Tuple[List[torch.Tensor], List[torch.Tensor]]:
     if args.is_vlm:
         plosses, _, acces = eagle3_model(
             input_ids=data["input_ids"].cuda(),
@@ -457,7 +485,7 @@ def run_forward(args: Namespace, eagle3_model: nn.Module, data: dict, target_mod
             )
         else:
             target = target_head(data["hidden_states"].cuda())
-            
+
         plosses, _, acces = eagle3_model(
             input_ids=eagle3_data.input_ids,
             attention_mask=eagle3_data.attention_mask,
@@ -468,7 +496,10 @@ def run_forward(args: Namespace, eagle3_model: nn.Module, data: dict, target_mod
     acces = torch.stack(acces).cpu().tolist()
     return plosses, acces
 
-def run_backward_and_update(args: Namespace, plosses: List[torch.Tensor], optimizer: Optimizer, global_step: int) -> None:
+
+def run_backward_and_update(
+    args: Namespace, plosses: List[torch.Tensor], optimizer: Optimizer, global_step: int
+) -> None:
     ploss_weight = [0.8**i for i in range(len(plosses))]
     ploss = (
         sum([ploss_weight[i] * plosses[i] for i in range(len(plosses))])
@@ -480,7 +511,15 @@ def run_backward_and_update(args: Namespace, plosses: List[torch.Tensor], optimi
         optimizer.step()
 
 
-def record_metrcs(args: Namespace, accuracies: List[float], plosses: List[float], global_step: int, tracker: Tracker, optimizer: Optional[Optimizer] = None, mode: str = "train") -> None:
+def record_metrcs(
+    args: Namespace,
+    accuracies: List[float],
+    plosses: List[float],
+    global_step: int,
+    tracker: Tracker,
+    optimizer: Optional[Optimizer] = None,
+    mode: str = "train",
+) -> None:
     logdict = {}
 
     if mode == "train" and optimizer is not None:
@@ -524,7 +563,9 @@ def main():
     # ================================================
     # 3. Build dataloader
     # ================================================
-    train_dataloader, vocab_mapping_path, eval_dataloader = build_dataloaders(args, draft_model_config, processor)
+    train_dataloader, vocab_mapping_path, eval_dataloader = build_dataloaders(
+        args, draft_model_config, processor
+    )
 
     # we load the vocab mapping then
     draft_model.load_vocab_mapping(vocab_mapping_path)
@@ -541,11 +582,14 @@ def main():
         )
     else:
         print_with_rank(f"Using provided total_steps: {args.total_steps}")
-    
+
     # ================================================
     # 4. Build Eagle3 model
     # ================================================
-    if args.is_vlm and getattr(draft_model_config, "target_model_type", None) == "qwen2_5_vl":
+    if (
+        args.is_vlm
+        and getattr(draft_model_config, "target_model_type", None) == "qwen2_5_vl"
+    ):
         eagle3_model = QwenVLOnlineEagle3Model(
             target_model=target_model,
             draft_model=draft_model,
@@ -559,7 +603,7 @@ def main():
             length=args.ttt_length,
             attention_backend=args.attention_backend,
         )
-   
+
     eagle3_model = FSDP(
         eagle3_model,
         use_orig_params=True,
@@ -617,7 +661,7 @@ def main():
             # ================================================
             # 7.1 Training Step
             # ================================================
-            plosses, acces = run_forward(args, eagle3_model, target_model, data)
+            plosses, acces = run_forward(args, eagle3_model, data, target_model)
             run_backward_and_update(args, plosses, optimizer, global_step)
 
             # log training metrics
@@ -625,7 +669,9 @@ def main():
             acces = [acc for acc in acces]
 
             if global_step % args.log_steps == 0:
-                record_metrcs(args, acces, plosses, global_step, tracker, optimizer, mode="train")
+                record_metrcs(
+                    args, acces, plosses, global_step, tracker, optimizer, mode="train"
+                )
 
             if dist.get_rank() == 0:
                 time_per_step = time.time() - last_time
@@ -633,24 +679,43 @@ def main():
                 avg_loss = sum(pl.item() for pl in plosses) / len(plosses)
                 avg_acc = sum(acces) / len(acces)
                 progress_bar.set_postfix(
-                    {"loss": f"{avg_loss:.2f}", "acc": f"{avg_acc:.2f}", "time": f"{time_per_step:.2f}s"}
+                    {
+                        "loss": f"{avg_loss:.2f}",
+                        "acc": f"{avg_acc:.2f}",
+                        "time": f"{time_per_step:.2f}s",
+                    }
                 )
-                
+
             # ================================================
             # 7.2 Evaluation Step
             # ================================================
-            if args.eval_data_path is not None and global_step % args.eval_interval == 0:
+            if (
+                args.eval_data_path is not None
+                and global_step % args.eval_interval == 0
+            ):
                 # Run evaluation
                 draft_model.eval()
 
                 for data in tqdm(eval_dataloader, desc=f"Evaluating Epoch {epoch}"):
                     with torch.no_grad():
-                        plosses, _, acces = run_forward(args, eagle3_model, target_model, data)
-                        eval_acces = [eval_acces[i] + [acces[i]] for i in range(len(acces))]
-                        eval_plosses = [
-                            eval_plosses[i] + [plosses[i].item()] for i in range(len(plosses))
+                        plosses, _, acces = run_forward(
+                            args, eagle3_model, data, target_model
+                        )
+                        eval_acces = [
+                            eval_acces[i] + [acces[i]] for i in range(len(acces))
                         ]
-                        record_metrcs(args, eval_acces, eval_plosses, global_step, tracker, mode="eval")
+                        eval_plosses = [
+                            eval_plosses[i] + [plosses[i].item()]
+                            for i in range(len(plosses))
+                        ]
+                        record_metrcs(
+                            args,
+                            eval_acces,
+                            eval_plosses,
+                            global_step,
+                            tracker,
+                            mode="eval",
+                        )
 
             # ================================================
             # 7.3 Save Checkpoints

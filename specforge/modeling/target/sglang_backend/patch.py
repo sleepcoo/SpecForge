@@ -1,18 +1,23 @@
-from typing import Optional
+import logging
 import os
+from datetime import timedelta
+from typing import Optional
+
+import sglang.srt.distributed.parallel_state as parallel_state
 import torch
 import torch.distributed as dist
-import logging
-from datetime import timedelta
-from sglang.srt.distributed import init_model_parallel_group
-import sglang.srt.distributed.parallel_state as parallel_state
-from sglang.srt.utils import get_bool_env_var
-from specforge.distributed import get_tp_group as get_specforge_tp_group
-from sglang.srt.distributed.parallel_state import GroupCoordinator
-from sglang.srt.layers.dp_attention import _DpGatheredBufferWrapper
-from sglang.srt.layers.dp_attention import compute_dp_attention_world_info, compute_dp_attention_local_info
 from sglang.srt.configs.model_config import ModelConfig
+from sglang.srt.distributed import init_model_parallel_group
+from sglang.srt.distributed.parallel_state import GroupCoordinator
+from sglang.srt.layers.dp_attention import (
+    _DpGatheredBufferWrapper,
+    compute_dp_attention_local_info,
+    compute_dp_attention_world_info,
+)
 from sglang.srt.server_args import ServerArgs
+from sglang.srt.utils import get_bool_env_var
+
+from specforge.distributed import get_tp_group as get_specforge_tp_group
 
 logger = logging.getLogger(__name__)
 
@@ -29,7 +34,9 @@ def init_distributed_environment(
         rank,
         backend,
     )
-    assert torch.distributed.is_initialized(), "distributed environment should be initialized first"
+    assert (
+        torch.distributed.is_initialized()
+    ), "distributed environment should be initialized first"
 
     tp_group = get_specforge_tp_group()
     world_size = dist.get_world_size()
@@ -102,8 +109,12 @@ def initialize_model_parallel(
         )
 
     # Build the tensor model-parallel groups.
-    num_tensor_model_parallel_groups: int = dist.get_world_size() // tensor_model_parallel_size
-    assert parallel_state._TP is None, "tensor model parallel group is already initialized"
+    num_tensor_model_parallel_groups: int = (
+        dist.get_world_size() // tensor_model_parallel_size
+    )
+    assert (
+        parallel_state._TP is None
+    ), "tensor model parallel group is already initialized"
     group_ranks = []
     for i in range(num_tensor_model_parallel_groups):
         ranks = list(
@@ -123,9 +134,11 @@ def initialize_model_parallel(
         pynccl_use_current_stream=duplicate_tp_group,
         torch_compile=torch_compile,
     )
-
+    parallel_state._MOE_TP = parallel_state._TP
     if duplicate_tp_group:
-        assert parallel_state._PDMUX_PREFILL_TP_GROUP is None, "tensor model parallel group for PD-Multiplexing Prefill is already initialized"
+        assert (
+            parallel_state._PDMUX_PREFILL_TP_GROUP is None
+        ), "tensor model parallel group for PD-Multiplexing Prefill is already initialized"
         assert (
             parallel_state._PDMUX_PREFILL_TP_GROUP is None
         ), "tensor model parallel group for PD-Multiplexing Prefill is already initialized"
@@ -146,7 +159,9 @@ def initialize_model_parallel(
     moe_ep_size = expert_model_parallel_size
 
     moe_tp_size = tensor_model_parallel_size // moe_ep_size
-    assert parallel_state._MOE_EP is None, "expert model parallel group is already initialized"
+    assert (
+        parallel_state._MOE_EP is None
+    ), "expert model parallel group is already initialized"
     group_ranks = []
     for i in range(num_tensor_model_parallel_groups):
         for j in range(moe_tp_size):
@@ -164,11 +179,17 @@ def initialize_model_parallel(
     )
 
     # Build the pipeline model-parallel groups.
-    num_pipeline_model_parallel_groups: int = dist.get_world_size() // pipeline_model_parallel_size
-    assert parallel_state._PP is None, "pipeline model parallel group is already initialized"
+    num_pipeline_model_parallel_groups: int = (
+        dist.get_world_size() // pipeline_model_parallel_size
+    )
+    assert (
+        parallel_state._PP is None
+    ), "pipeline model parallel group is already initialized"
     group_ranks = []
     for i in range(num_pipeline_model_parallel_groups):
-        ranks = list(range(i, dist.get_world_size(), num_pipeline_model_parallel_groups))
+        ranks = list(
+            range(i, dist.get_world_size(), num_pipeline_model_parallel_groups)
+        )
         group_ranks.append(ranks)
     # pipeline parallel does not need custom allreduce
     parallel_state._PP = init_model_parallel_group(
@@ -179,12 +200,13 @@ def initialize_model_parallel(
         group_name="pp",
     )
 
+
 def initialize_dp_attention(
     server_args: ServerArgs,
     model_config: ModelConfig,
 ):
-    from sglang.srt.layers.sampler import SYNC_TOKEN_IDS_ACROSS_TP
     import sglang.srt.layers.dp_attention as dp_attention
+    from sglang.srt.layers.sampler import SYNC_TOKEN_IDS_ACROSS_TP
 
     enable_dp_attention = server_args.enable_dp_attention
     tp_size = server_args.tp_size
@@ -197,12 +219,10 @@ def initialize_dp_attention(
     dp_attention._ENABLE_DP_ATTENTION_FLAG = enable_dp_attention
 
     (
-        dp_attention._ATTN_TP_RANK, 
-        dp_attention._ATTN_TP_SIZE, 
-        dp_attention._ATTN_DP_RANK
-    ) = compute_dp_attention_world_info(
-        enable_dp_attention, tp_rank, tp_size, dp_size
-    )
+        dp_attention._ATTN_TP_RANK,
+        dp_attention._ATTN_TP_SIZE,
+        dp_attention._ATTN_DP_RANK,
+    ) = compute_dp_attention_world_info(enable_dp_attention, tp_rank, tp_size, dp_size)
     _, _, dp_attention._LOCAL_ATTN_DP_RANK = compute_dp_attention_local_info(
         enable_dp_attention, tp_rank, tp_size, dp_size, moe_dense_tp_size
     )
@@ -212,7 +232,9 @@ def initialize_dp_attention(
         if moe_dense_tp_size is None:
             dp_attention._LOCAL_ATTN_DP_SIZE = dp_attention._ATTN_DP_SIZE
         else:
-            dp_attention._LOCAL_ATTN_DP_SIZE = max(1, dp_size // (tp_size // moe_dense_tp_size))
+            dp_attention._LOCAL_ATTN_DP_SIZE = max(
+                1, dp_size // (tp_size // moe_dense_tp_size)
+            )
     else:
         dp_attention._ATTN_DP_SIZE = 1
         dp_attention._LOCAL_ATTN_DP_SIZE = 1
@@ -221,11 +243,13 @@ def initialize_dp_attention(
     num_model_parallel_groups = dist.get_world_size() // (pp_size * tp_size)
     mp_size = pp_size * tp_size
     group_ranks = []
- 
+
     for i in range(num_model_parallel_groups):
         ranks = [
             list(range(head, head + dp_attention._ATTN_TP_SIZE))
-            for head in range(mp_size * i, mp_size * (i + 1), dp_attention._ATTN_TP_SIZE)
+            for head in range(
+                mp_size * i, mp_size * (i + 1), dp_attention._ATTN_TP_SIZE
+            )
         ]
         group_ranks.extend(ranks)
 
