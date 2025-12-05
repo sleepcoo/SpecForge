@@ -543,6 +543,9 @@ class Qwen3MoeModel(Qwen3MoePreTrainedModel):
             if output_hidden_states is not None
             else self.config.output_hidden_states
         )
+        layers_to_output_hidden_states = flash_attn_kwargs.pop(
+            "layers_to_output_hidden_states", None
+        )
         use_cache = use_cache if use_cache is not None else self.config.use_cache
 
         if (input_ids is None) ^ (inputs_embeds is not None):
