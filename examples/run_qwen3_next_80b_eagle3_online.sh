@@ -24,5 +24,6 @@ torchrun \
     --cache-dir $ROOT_DIR/cache \
     --embedding-key model.embed_tokens.weight \
     --tp-size $TP_SIZE \
+    --sglang-mem-fraction-static 0.5 \
     --build-dataset-num-proc $BUILD_DATASET_NUM_PROC \
     --target-model-backend sglang
