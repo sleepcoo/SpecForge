@@ -75,6 +75,12 @@ def parse_args():
         "--config-list", type=str, nargs="+", default=["1,0,0,0", "1,3,1,4"]
     )
     benchmark_group.add_argument(
+        "--name",
+        type=str,
+        default=None,
+        help="name of this benchmark run, if provided, will be added to the output file name",
+    )
+    benchmark_group.add_argument(
         "--benchmark-list",
         type=str,
         nargs="+",
@@ -84,7 +90,6 @@ def parse_args():
             "humaneval:200",
             "math500:200",
             "ceval:200",
-            "cmmlu:200",
         ],
         help=f"The list of benchmarks to run. The format is <benchmark-name>:<num-prompts>:<subset>,<subset>. We support the following benchmarks: {', '.join(BENCHMARKS.benchmarks.keys())}",
     )
@@ -94,18 +99,6 @@ def parse_args():
         default=False,
     )
     return parser.parse_args()
-
-
-# def get_cmmlu_conversations(num_prompts: int):
-#     dataset = load_dataset("zhaode/cmmlu")["train"]
-#     prompts = [q["instruction"] for q in dataset][:num_prompts]
-#     bench_name = "ceval"
-#     bench_conversations = {bench_name: []}
-#     for i in range(len(prompts)):
-#         bench_conversations[bench_name].append(
-#             [{"role": "user", "content": prompts[i]}]
-#         )
-#     return bench_conversations
 
 
 def launch_sglang_server(
@@ -255,7 +248,10 @@ def main():
 
     os.makedirs(args.output_dir, exist_ok=True)
     timestamp = time.strftime("%Y%m%d_%H%M%S")
-    result_file = os.path.join(args.output_dir, f"results_{timestamp}.jsonl")
+    result_file = os.path.join(
+        args.output_dir,
+        f"{args.name + '_' if args.name else ''}results_{timestamp}.jsonl",
+    )
     with open(result_file, "w") as f:
         json.dump(results, f, indent=4)
     print(f"Results saved to {result_file}")
