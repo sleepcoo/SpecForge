@@ -170,6 +170,7 @@ export function processModelData(rawData) {
       targetModel: currentTarget,
       draftModel: (draftModel === '-' || draftModel === '') ? 'None' : draftModel,
       config: eagleConfig !== '-' && eagleConfig !== '' ? eagleConfig : parallelConfig,
+      parallelConfig: parallelConfig !== '-' ? parallelConfig : null,
       metrics,
       baseline: currentBaselineMetrics
     };
