@@ -47,6 +47,8 @@ jobs:
           npm run build
           mkdir -p ../_static/dashboard
           cp -r dist/* ../_static/dashboard/
+          # Clean up node_modules to prevent Sphinx from processing them
+          rm -rf node_modules
 
       - name: Build documentation
         run: |
