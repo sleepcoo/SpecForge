@@ -60,6 +60,9 @@
         </tbody>
       </table>
     </div>
+    <div class="table-note">
+      <p><strong>Config:</strong> Parallel decoding configuration (batch_size, num_steps, topk, num_draft_tokens)</p>
+    </div>
   </div>
 </template>
 
@@ -319,5 +322,22 @@ th.sticky-col {
 
 .mobile-label {
   display: none;
+}
+
+.table-note {
+  padding: 16px 20px;
+  background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+  border-top: 1px solid #e2e8f0;
+  font-size: 0.9rem;
+  color: var(--color-text-secondary);
+}
+
+.table-note p {
+  margin: 0;
+}
+
+.table-note strong {
+  color: var(--color-text-main);
+  font-weight: 600;
 }
 </style>

@@ -61,6 +61,7 @@
 
         <div class="chart-section">
           <h3>Performance Visualization</h3>
+          <p class="chart-description">Hardware: H200 | Metric: Throughput (tokens/s)</p>
           <div class="chart-container">
             <BenchmarkChart
               :data="currentData"
@@ -425,7 +426,17 @@ h1 {
   font-size: 1.5rem;
   font-weight: 700;
   color: var(--color-text-main);
+  margin-bottom: 12px;
+}
+
+.chart-description {
+  font-size: 0.95rem;
+  color: var(--color-text-secondary);
   margin-bottom: 24px;
+  padding: 8px 16px;
+  background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+  border-left: 3px solid var(--color-primary);
+  border-radius: 4px;
 }
 
 .chart-container {
