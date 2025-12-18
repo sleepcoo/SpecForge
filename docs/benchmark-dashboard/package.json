@@ -1,8 +1,8 @@
 {
-  "name": "specforge-benchmark-dashboard",
+  "name": "specforge-spec-bundle",
   "private": false,
   "version": "1.0.0",
-  "description": "Interactive benchmark visualization dashboard for SpecForge",
+  "description": "Interactive SpecBundle visualization dashboard for SpecForge",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -17,9 +17,9 @@
   },
   "keywords": [
     "specforge",
+    "spec-bundle",
     "benchmark",
     "visualization",
-    "dashboard",
     "speculative-decoding",
     "llm",
     "performance"

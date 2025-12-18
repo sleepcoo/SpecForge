@@ -40,13 +40,13 @@ jobs:
           sudo apt-get update && sudo apt-get install -y pandoc parallel retry
           pip install -r docs/requirements.txt
 
-      - name: Build benchmark dashboard
+      - name: Build spec bundle dashboard
         run: |
           cd docs/benchmark-dashboard
           npm ci
           npm run build
-          mkdir -p ../dashboard
-          cp -r dist/* ../dashboard/
+          mkdir -p ../spec_bundle
+          cp -r dist/* ../spec_bundle/
           # Clean up node_modules to prevent Sphinx from processing them
           rm -rf node_modules
 
