@@ -107,7 +107,7 @@
     </div>
 
     <footer class="footer">
-      <p>&copy; 2024 SpecForge Team</p>
+      <p>Powered by SpecForge Team</p>
     </footer>
   </div>
 </template>
