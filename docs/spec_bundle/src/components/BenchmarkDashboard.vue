@@ -8,7 +8,7 @@
         <div class="header-content">
           <div class="brand">
             <div class="logo-icon">
-              <img src="../../../assets/logo.png" alt="SpecForge Logo" style="width: 100%; height: 100%; object-fit: contain;">
+              <img src="/logo.png" alt="SpecForge Logo" style="width: 100%; height: 100%; object-fit: contain;">
             </div>
           </div>
           <h1>SpecBundle</h1>

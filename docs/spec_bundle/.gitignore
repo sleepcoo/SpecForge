@@ -12,6 +12,9 @@ dist
 dist-ssr
 *.local
 
+# Auto-generated logo (copied from assets/)
+public/logo.png
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
