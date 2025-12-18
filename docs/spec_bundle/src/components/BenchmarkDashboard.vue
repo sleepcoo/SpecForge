@@ -8,7 +8,7 @@
         <div class="header-content">
           <div class="brand">
             <div class="logo-icon">
-              <img src="../assets/specforge-logo.png" alt="SpecForge Logo" style="width: 100%; height: 100%; object-fit: contain;">
+              <img src="../../../assets/logo.png" alt="SpecForge Logo" style="width: 100%; height: 100%; object-fit: contain;">
             </div>
           </div>
           <h1>SpecBundle</h1>
@@ -219,7 +219,7 @@ onMounted(async () => {
   flex-direction: row;
   align-items: center;
   justify-content: center;
-  gap: 1.25rem;
+  gap: 1rem;
 }
 
 .brand {
@@ -230,7 +230,7 @@ onMounted(async () => {
 
 .logo-icon {
   width: auto;
-  height: 80px; /* Enlarged logo for better visual presence */
+  height: 60px; /* Adjusted for better proportion with title */
   display: flex;
   align-items: center;
   justify-content: center;
@@ -247,7 +247,7 @@ onMounted(async () => {
 h1 {
   font-family: var(--font-display);
   font-weight: 700;
-  font-size: 2.5rem;
+  font-size: 2.8rem;
   line-height: 1;
   background: linear-gradient(135deg, var(--color-text-main) 0%, var(--color-primary) 100%);
   -webkit-background-clip: text;
