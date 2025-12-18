@@ -45,16 +45,18 @@ jobs:
           cd docs/benchmark-dashboard
           npm ci
           npm run build
-          mkdir -p ../spec_bundle
-          cp -r dist/* ../spec_bundle/
           # Clean up node_modules to prevent Sphinx from processing them
           rm -rf node_modules
+          cd ..
 
       - name: Build documentation
         run: |
           cd docs
           make compile
           make html
+          # Copy spec_bundle to root of output directory
+          mkdir -p _build/html/spec_bundle
+          cp -r benchmark-dashboard/dist/* _build/html/spec_bundle/
 
       - name: Add .nojekyll file
         run: |
