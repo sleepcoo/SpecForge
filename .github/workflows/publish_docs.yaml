@@ -42,8 +42,6 @@ jobs:
 
       - name: Build spec bundle dashboard
         run: |
-          # Copy logo from project root to dashboard assets
-          cp assets/logo.png docs/spec_bundle/src/assets/specforge-logo.png
           cd docs/spec_bundle
           npm ci
           npm run build
