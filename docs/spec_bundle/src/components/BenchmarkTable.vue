@@ -86,14 +86,14 @@ const showHardware = computed(() => {
 function formatDraftModel(model) {
   if (!model) return '-';
   if (model === '-' || model === 'None') return 'Baseline';
-  if (model.includes('Spec-Bundle')) return 'Spec-Bundle';
+  if (model.includes('SpecBundle')) return 'SpecBundle';
   // Simplify long names
   return model.split('/').pop() || model;
 }
 
 function getDraftModelClass(model) {
   if (!model || model === '-' || model === 'None') return 'badge-baseline';
-  if (model.includes('Spec-Bundle')) return 'badge-spec';
+  if (model.includes('SpecBundle')) return 'badge-spec';
   if (model.toLowerCase().includes('eagle')) return 'badge-eagle';
   return 'badge-default';
 }

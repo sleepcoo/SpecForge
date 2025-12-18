@@ -33,7 +33,7 @@ jobs:
         with:
           node-version: '20'
           cache: 'npm'
-          cache-dependency-path: docs/benchmark-dashboard/package-lock.json
+          cache-dependency-path: docs/spec_bundle/package-lock.json
 
       - name: Install dependencies
         run: |
@@ -42,7 +42,7 @@ jobs:
 
       - name: Build spec bundle dashboard
         run: |
-          cd docs/benchmark-dashboard
+          cd docs/spec_bundle
           npm ci
           npm run build
           # Clean up node_modules to prevent Sphinx from processing them
@@ -54,9 +54,9 @@ jobs:
           cd docs
           make compile
           make html
-          # Copy spec_bundle to root of output directory
-          mkdir -p _build/html/spec_bundle
-          cp -r benchmark-dashboard/dist/* _build/html/spec_bundle/
+          # Copy SpecBundle to root of output directory
+          mkdir -p _build/html/SpecBundle
+          cp -r spec_bundle/dist/* _build/html/SpecBundle/
 
       - name: Add .nojekyll file
         run: |

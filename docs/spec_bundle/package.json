@@ -13,11 +13,11 @@
   "repository": {
     "type": "git",
     "url": "https://github.com/sgl-project/SpecForge.git",
-    "directory": "docs/benchmark-dashboard"
+    "directory": "docs/spec_bundle"
   },
   "keywords": [
     "specforge",
-    "spec-bundle",
+    "specbundle",
     "benchmark",
     "visualization",
     "speculative-decoding",

@@ -55,7 +55,7 @@ const chartOption = computed(() => {
   // Helper to determine color based on draft model type
   const getColor = (draftModel) => {
     const draft = draftModel ? draftModel.toLowerCase() : '';
-    if (draft.includes('spec-bundle')) {
+    if (draft.includes('specbundle')) {
         return {
           type: 'linear',
           x: 0, y: 0, x2: 0, y2: 1,
@@ -105,7 +105,7 @@ const chartOption = computed(() => {
 
         let itemStyleColor;
 
-        if (draft.includes('spec-bundle')) {
+        if (draft.includes('specbundle')) {
            itemStyleColor = {
               type: 'linear',
               x: 0, y: 0, x2: 0, y2: 1,
