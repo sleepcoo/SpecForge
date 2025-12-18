@@ -1,8 +1,8 @@
 import * as XLSX from 'xlsx';
 
 export const modelFiles = {
-  'Qwen3': '/raw_data/SpecBundle-Qwen3.xlsx',
-  'Llama': '/raw_data/SpecBundle-Llama.xlsx'
+  'Qwen3': './raw_data/SpecBundle-Qwen3.xlsx',
+  'Llama': './raw_data/SpecBundle-Llama.xlsx'
 };
 
 export async function loadXLSX(filePath) {

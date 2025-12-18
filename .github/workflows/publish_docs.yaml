@@ -45,8 +45,8 @@ jobs:
           cd docs/benchmark-dashboard
           npm ci
           npm run build
-          mkdir -p ../_static/dashboard
-          cp -r dist/* ../_static/dashboard/
+          mkdir -p ../dashboard
+          cp -r dist/* ../dashboard/
           # Clean up node_modules to prevent Sphinx from processing them
           rm -rf node_modules
 
