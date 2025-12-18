@@ -48,6 +48,10 @@ const chartOption = computed(() => {
     return benchmarksList.some(b => d.metrics[b] && d.metrics[b][metricKey] != null);
   });
 
+  // Extract parallel config for current target model(s)
+  const parallelConfigs = [...new Set(validData.map(d => d.parallelConfig).filter(c => c && c !== '-' && c !== null))];
+  const parallelConfigText = parallelConfigs.length > 0 ? ` (${parallelConfigs.join(', ')})` : '';
+
   // Calculate values
   const series = [];
   let xAxisData = [];
@@ -182,7 +186,7 @@ const chartOption = computed(() => {
   }
 
   const displayTitle = isAllBenchmarks
-    ? (isSpeedup ? 'Speedup Comparison by Dataset' : `Performance Comparison by Dataset - ${metricLabel}`)
+    ? `Hardware: H200 ${parallelConfigText} | Metric: Throughput (tokens/s)`
     : `${benchmarksList[0]} Performance`;
 
   return {
