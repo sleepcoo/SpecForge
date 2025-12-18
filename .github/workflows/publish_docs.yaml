@@ -28,11 +28,25 @@ jobs:
         with:
           python-version: '3.13'
 
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: docs/benchmark-dashboard/package-lock.json
 
       - name: Install dependencies
         run: |
           apt-get update && apt-get install -y pandoc parallel retry
           pip install -r docs/requirements.txt
+
+      - name: Build benchmark dashboard
+        run: |
+          cd docs/benchmark-dashboard
+          npm ci
+          npm run build
+          mkdir -p ../_static/dashboard
+          cp -r dist/* ../_static/dashboard/
 
       - name: Build documentation
         run: |
