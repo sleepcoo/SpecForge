@@ -61,7 +61,6 @@
 
         <div class="chart-section">
           <h3>Performance Visualization</h3>
-          <p class="chart-description">Hardware: H200 | Metric: Throughput (tokens/s)</p>
           <div class="chart-container">
             <BenchmarkChart
               :data="currentData"
