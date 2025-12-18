@@ -16,7 +16,7 @@ concurrency:
 jobs:
   deploy-github-pages:
     runs-on: ubuntu-latest
-    if: github.repository == 'sgl-project/specforge'
+    if: github.repository == 'sgl-project/specforge' || github.repository == 'sleepcoo/SpecForge'
     permissions:
       contents: write
     steps:
