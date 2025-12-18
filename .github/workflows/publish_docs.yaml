@@ -40,21 +40,23 @@ jobs:
           sudo apt-get update && sudo apt-get install -y pandoc parallel retry
           pip install -r docs/requirements.txt
 
-      - name: Build benchmark dashboard
+      - name: Build spec bundle dashboard
         run: |
           cd docs/benchmark-dashboard
           npm ci
           npm run build
-          mkdir -p ../dashboard
-          cp -r dist/* ../dashboard/
           # Clean up node_modules to prevent Sphinx from processing them
           rm -rf node_modules
+          cd ..
 
       - name: Build documentation
         run: |
           cd docs
           make compile
           make html
+          # Copy spec_bundle to root of output directory
+          mkdir -p _build/html/spec_bundle
+          cp -r benchmark-dashboard/dist/* _build/html/spec_bundle/
 
       - name: Add .nojekyll file
         run: |

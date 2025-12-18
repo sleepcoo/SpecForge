@@ -107,7 +107,7 @@
     </div>
 
     <footer class="footer">
-      <p>&copy; 2024 SpecForge Benchmark. Open Source LLM Evaluation.</p>
+      <p>&copy; 2024 SpecForge SpecBundle. Open Source LLM Evaluation.</p>
     </footer>
   </div>
 </template>
