@@ -11,7 +11,7 @@
               <img src="../assets/specforge-logo.png" alt="SpecForge Logo" style="width: 100%; height: 100%; object-fit: contain;">
             </div>
           </div>
-          <h1>Spec-Bundle</h1>
+          <h1>SpecBundle</h1>
         </div>
       </header>
 
@@ -107,7 +107,7 @@
     </div>
 
     <footer class="footer">
-      <p>&copy; 2024 SpecForge SpecBundle. Open Source LLM Evaluation.</p>
+      <p>&copy; 2024 SpecForge Team</p>
     </footer>
   </div>
 </template>

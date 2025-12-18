@@ -64,7 +64,7 @@ function findColumnIndices(headerRow) {
     }
   });
 
-  // Heuristic for Hardware if missing (Spec-Bundle Llama.csv case)
+  // Heuristic for Hardware if missing (SpecBundle Llama.csv case)
   // If we have Draft and Parallel, and there is a gap of 1 in between
   if (colMap.hardware === -1 && colMap.draft !== -1 && colMap.parallel !== -1) {
     if (colMap.parallel - colMap.draft === 2) {
