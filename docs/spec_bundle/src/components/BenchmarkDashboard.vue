@@ -125,22 +125,21 @@ import {
 } from '../utils/dataProcessor';
 
 const loading = ref(true);
-const allData = ref({});
 const allProcessedData = ref({});
-const selectedFamily = ref('GPT-OSS');
+const selectedFamily = ref('Kimi-K2-Instruct');
 const selectedTargetModel = ref('all');
 const selectedBenchmark = ref('all');
 const selectedMetric = ref('throughput');
 
-// Fixed Order for Metrics
-const benchmarks = ['MTBench', 'HumanEval', 'GSM8K', 'Math500'];
+// Fixed Order for Metrics - matching JSON data
+const benchmarks = ['gsm8k', 'math500', 'mtbench', 'humaneval', 'livecodebench', 'financeqa', 'gpqa'];
 const metricOptions = [
   { value: 'throughput', label: 'Throughput (tokens/s)' },
   { value: 'accLen', label: 'Acceptance Length' },
   { value: 'speedup', label: 'Speedup vs Baseline' }
 ];
 
-const modelFamilies = computed(() => getModelFamilies(allData.value));
+const modelFamilies = computed(() => getModelFamilies(allProcessedData.value));
 
 const uniqueModels = computed(() => {
   const familyData = allProcessedData.value[selectedFamily.value] || [];
@@ -171,19 +170,18 @@ watch([selectedFamily, uniqueModels], ([newFamily, newModels]) => {
 
 onMounted(async () => {
   try {
-    allData.value = await loadAllData();
+    const jsonData = await loadAllData();
 
-    for (const [family, data] of Object.entries(allData.value)) {
-      allProcessedData.value[family] = processModelData(data);
+    // Process each model family from JSON
+    for (const [modelFamily, modelData] of Object.entries(jsonData)) {
+      allProcessedData.value[modelFamily] = processModelData(modelData);
     }
 
     // Set default family if available
-    const families = Object.keys(allData.value);
+    const families = Object.keys(allProcessedData.value);
     if (families.length > 0 && !families.includes(selectedFamily.value)) {
       selectedFamily.value = families[0];
     }
-
-    // Initial target model selection will be handled by the watch
 
     loading.value = false;
   } catch (error) {

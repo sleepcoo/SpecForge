@@ -38,7 +38,7 @@ const props = defineProps({
 
 const chartOption = computed(() => {
   const isAllBenchmarks = props.benchmark === 'all';
-  const benchmarksList = isAllBenchmarks ? ['MTBench', 'HumanEval', 'GSM8K', 'Math500'] : [props.benchmark];
+  const benchmarksList = isAllBenchmarks ? ['gsm8k', 'math500', 'mtbench', 'humaneval', 'livecodebench', 'financeqa', 'gpqa'] : [props.benchmark];
   const metricKey = props.metric === 'accLen' ? 'accLen' : 'throughput';
   const metricLabel = props.metric === 'accLen' ? 'Acceptance Length' : 'Throughput (tokens/s)';
   const isSpeedup = props.metric === 'speedup';
