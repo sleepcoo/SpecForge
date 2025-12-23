@@ -13,7 +13,7 @@
         </a>
         <div class="header-content">
           <div class="brand">
-            <img src="/spec_bundle_logo.jpg" alt="SpecBundle Logo" class="main-logo">
+            <img src="/specbundle-logo.png" alt="SpecBundle Logo" class="main-logo">
             <div class="powered-by">
               All SpecBundle models are powered by <span class="powered-by-brand">SpecForge</span>
             </div>
