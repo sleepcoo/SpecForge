@@ -8,6 +8,9 @@
         <div class="header-content">
           <div class="brand">
             <img src="/spec_bundle_logo.jpg" alt="SpecBundle Logo" class="main-logo">
+            <div class="powered-by">
+              All SpecBundle models are powered by <span class="powered-by-brand">SpecForge</span>
+            </div>
           </div>
         </div>
       </header>
@@ -218,15 +221,29 @@ onMounted(async () => {
 
 .brand {
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
+  gap: 16px;
 }
 
 .main-logo {
-  max-width: 500px;
+  max-width: 700px;
   width: auto;
-  height: 100px;
+  height: 140px;
   object-fit: contain;
+}
+
+.powered-by {
+  font-size: 0.9375rem;
+  color: var(--color-text-secondary);
+  font-weight: 400;
+  text-align: center;
+}
+
+.powered-by-brand {
+  color: var(--color-primary);
+  font-weight: 600;
 }
 
 .config-legend {
