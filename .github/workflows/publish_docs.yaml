@@ -42,8 +42,9 @@ jobs:
 
       - name: Build spec bundle dashboard
         run: |
-          # Copy logo to public directory
+          # Copy logos to public directory
           cp assets/logo.png docs/spec_bundle/public/logo.png
+          cp docs/_static/imgs/specbundle-logo.png docs/spec_bundle/public/specbundle-logo.png
           cd docs/spec_bundle
           npm ci
           npm run build
