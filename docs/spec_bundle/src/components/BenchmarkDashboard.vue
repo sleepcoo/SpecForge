@@ -210,6 +210,7 @@ onMounted(async () => {
   min-height: 100vh;
   display: flex;
   flex-direction: column;
+  background: #F8FAFC;
 }
 
 .main-container {
