@@ -65,6 +65,7 @@
               :metric="selectedMetric"
             />
           </div>
+          <div class="config-legend">Config (batch_size - step - topk - nums_draft_tokens)</div>
         </div>
 
         <div class="table-section">
@@ -404,7 +405,15 @@ onMounted(async () => {
   font-size: 1.5rem;
   font-weight: 700;
   color: var(--color-text-main);
-  margin-bottom: 12px;
+  margin-bottom: 8px;
+}
+
+.chart-section .config-legend {
+  font-size: 0.875rem;
+  color: var(--color-text-secondary);
+  font-weight: 500;
+  margin-top: 16px;
+  text-align: center;
 }
 
 .chart-description {

@@ -191,8 +191,8 @@ const chartOption = computed(() => {
   }
 
   const displayTitle = isAllBenchmarks
-    ? `Hardware: H200 ${parallelConfigText} | Metric: Throughput (tokens/s) | Config (batch_size-step-topk-nums_draft_tokens)`
-    : `${benchmarksList[0]} Performance | Config (batch_size-step-topk-nums_draft_tokens)`;
+    ? `Hardware: H200 ${parallelConfigText} | Metric: Throughput (tokens/s)`
+    : `${benchmarksList[0]} Performance`;
 
 
   return {
