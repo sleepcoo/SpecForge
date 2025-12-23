@@ -1,7 +1,7 @@
 # 🔥 SpecBundle
 
 <div style="text-align:center;">
-    ![specbundle logo]({static}imgs/specbundle-logo.png){width="400"}
+    <img src="/specbundle-logo.png" alt="specbundle logo" width="400"></img>
 </div>
 
 
