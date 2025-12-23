@@ -6,6 +6,7 @@
 
 <script setup>
 import { computed } from 'vue';
+import { removeSGLangPrefix } from '../utils/dataProcessor';
 import { use } from 'echarts/core';
 import { CanvasRenderer } from 'echarts/renderers';
 import { BarChart, LineChart } from 'echarts/charts';
@@ -77,7 +78,8 @@ const chartOption = computed(() => {
       if (isBaseline) {
           return 'Baseline (No Draft Model)';
       }
-      const modelName = d.draftModel.split('/').pop();
+      const cleanedModel = removeSGLangPrefix(d.draftModel);
+      const modelName = cleanedModel.split('/').pop();
       const config = (d.config === '0-0-0' || !d.config || d.config === '-') ? '' : d.config;
       return config ? `${modelName}\n(${config})` : modelName;
   };

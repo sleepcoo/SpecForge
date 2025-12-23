@@ -20,7 +20,7 @@
         <tbody>
           <tr v-for="(row, index) in data" :key="index">
             <td class="model-name sticky-col">
-              {{ row.targetModel }}
+              {{ formatModelName(row.targetModel) }}
               <div class="mobile-label">Target</div>
             </td>
             <td class="draft-model-cell">
@@ -65,6 +65,7 @@
 
 <script setup>
 import { computed } from 'vue';
+import { removeSGLangPrefix } from '../utils/dataProcessor';
 
 const props = defineProps({
   data: { type: Array, required: true },
@@ -83,12 +84,19 @@ const showHardware = computed(() => {
   return props.data.some(row => row.hardware && row.hardware !== '-');
 });
 
+function formatModelName(model) {
+  if (!model) return '-';
+  const cleaned = removeSGLangPrefix(model);
+  return cleaned.split('/').pop() || cleaned;
+}
+
 function formatDraftModel(model) {
   if (!model) return '-';
   if (model === '-' || model === 'None') return 'Baseline';
   if (model.includes('SpecBundle')) return 'SpecBundle';
-  // Simplify long names
-  return model.split('/').pop() || model;
+  // Remove SGLang-EAGLE3 prefix and simplify long names
+  const cleaned = removeSGLangPrefix(model);
+  return cleaned.split('/').pop() || cleaned;
 }
 
 function formatConfigDetails(row) {

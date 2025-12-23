@@ -5,12 +5,26 @@
 
       <!-- Header / Hero -->
       <header class="header">
+        <a href="https://docs.sglang.io/SpecForge/" target="_blank" rel="noopener noreferrer" class="back-to-docs">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M19 12H5M12 19l-7-7 7-7"/>
+          </svg>
+          <span>Back to SpecForge Docs</span>
+        </a>
         <div class="header-content">
           <div class="brand">
             <img src="/spec_bundle_logo.jpg" alt="SpecBundle Logo" class="main-logo">
             <div class="powered-by">
               All SpecBundle models are powered by <span class="powered-by-brand">SpecForge</span>
             </div>
+            <a href="https://huggingface.co/collections/lmsys/specbundle" target="_blank" rel="noopener noreferrer" class="models-link">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
+                <polyline points="15 3 21 3 21 9"></polyline>
+                <line x1="10" y1="14" x2="21" y2="3"></line>
+              </svg>
+              View All Models on Hugging Face
+            </a>
           </div>
         </div>
       </header>
@@ -47,7 +61,7 @@
         <div class="stats-overview">
           <div class="stat-card">
             <span class="stat-label">Target Model</span>
-            <span class="stat-value">{{ selectedTargetModel === 'all' ? 'All' : selectedTargetModel }}</span>
+            <span class="stat-value">{{ selectedTargetModel === 'all' ? 'All' : removeSGLangPrefix(selectedTargetModel) }}</span>
           </div>
           <div class="stat-card">
             <span class="stat-label">Draft Models</span>
@@ -120,7 +134,8 @@ import BenchmarkTable from './BenchmarkTable.vue';
 import {
   loadAllData,
   processModelData,
-  getTargetModels
+  getTargetModels,
+  removeSGLangPrefix
 } from '../utils/dataProcessor';
 
 const loading = ref(true);
@@ -209,6 +224,48 @@ onMounted(async () => {
 .header {
   margin-bottom: 40px;
   text-align: center;
+  position: relative;
+}
+
+.back-to-docs {
+  position: absolute;
+  top: 0;
+  left: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  background: white;
+  color: var(--color-text-secondary);
+  text-decoration: none;
+  border-radius: 8px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  border: 1px solid #e2e8f0;
+}
+
+.back-to-docs:hover {
+  color: var(--color-primary);
+  border-color: var(--color-primary);
+  box-shadow: 0 4px 12px rgba(79, 70, 229, 0.15);
+  transform: translateX(-2px);
+}
+
+.back-to-docs:active {
+  transform: translateX(0);
+}
+
+.back-to-docs svg {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  transition: transform 0.3s ease;
+}
+
+.back-to-docs:hover svg {
+  transform: translateX(-2px);
 }
 
 .header-content {
@@ -244,6 +301,38 @@ onMounted(async () => {
 .powered-by-brand {
   color: var(--color-primary);
   font-weight: 600;
+}
+
+.models-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+  padding: 10px 20px;
+  background: var(--color-primary);
+  color: white;
+  text-decoration: none;
+  border-radius: 8px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 2px 8px rgba(79, 70, 229, 0.2);
+}
+
+.models-link:hover {
+  background: var(--color-primary-dark);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(79, 70, 229, 0.3);
+}
+
+.models-link:active {
+  transform: translateY(0);
+}
+
+.models-link svg {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
 }
 
 .config-legend {
@@ -493,5 +582,20 @@ onMounted(async () => {
   .main-container { padding: 20px 16px; }
   .chart-section, .table-section { padding: 20px; }
   .tabs-scroll { flex-wrap: wrap; }
+  .back-to-docs {
+    position: relative;
+    top: auto;
+    left: auto;
+    margin-bottom: 20px;
+    align-self: flex-start;
+  }
+  .back-to-docs span {
+    display: none;
+  }
+  .header {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
 }
 </style>

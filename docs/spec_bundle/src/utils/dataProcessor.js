@@ -87,3 +87,31 @@ export function getTargetModels(allData) {
 export function extractUniqueTargetModels(processedData) {
   return [...new Set(processedData.map(d => d.targetModel).filter(Boolean))];
 }
+
+export function removeSGLangPrefix(modelName) {
+  if (!modelName) return modelName;
+  // Remove "SGLang-EAGLE3" prefix if present (handles various formats)
+  // Examples: "lmsys/SGLang-EAGLE3-..." -> "lmsys/..."
+  //           "SGLang-EAGLE3/..." -> "..."
+  //           "SGLang-EAGLE3-..." -> "..."
+  let cleaned = String(modelName);
+
+  // Remove "SGLang-EAGLE3-" pattern (with hyphen after, can be preceded by / or start of string)
+  cleaned = cleaned.replace(/(^|\/)SGLang-EAGLE3-/gi, '$1');
+
+  // Remove "SGLang-EAGLE3/" pattern (with slash after)
+  cleaned = cleaned.replace(/(^|\/)SGLang-EAGLE3\//gi, '$1');
+
+  // Remove standalone "SGLang-EAGLE3" at the start (not followed by - or /)
+  cleaned = cleaned.replace(/^SGLang-EAGLE3(?![-\/])/gi, '');
+
+  // Clean up any double slashes
+  cleaned = cleaned.replace(/\/+/g, '/');
+
+  // Remove leading slash if present (unless it's the only character)
+  if (cleaned.length > 1) {
+    cleaned = cleaned.replace(/^\//, '');
+  }
+
+  return cleaned || modelName;
+}
