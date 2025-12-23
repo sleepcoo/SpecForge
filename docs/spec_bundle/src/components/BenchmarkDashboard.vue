@@ -7,27 +7,24 @@
       <header class="header">
         <div class="header-content">
           <div class="brand">
-            <div class="logo-icon">
-              <img src="/logo.png" alt="SpecForge Logo" style="width: 100%; height: 100%; object-fit: contain;">
-            </div>
+            <img src="/spec_bundle_logo.jpg" alt="SpecBundle Logo" class="main-logo">
           </div>
-          <h1>SpecBundle</h1>
         </div>
       </header>
 
       <!-- Dashboard Controls -->
       <div class="dashboard-controls">
         <FilterControls
-          :modelFamilies="modelFamilies"
-          :selectedFamily="selectedFamily"
-          :targetModels="uniqueModels"
+          :targetModels="targetModels"
           :selectedTargetModel="selectedTargetModel"
+          :draftModels="draftModels"
+          :selectedDraftModel="selectedDraftModel"
           :benchmarks="benchmarks"
           :selectedBenchmark="selectedBenchmark"
           :metrics="metricOptions"
           :selectedMetric="selectedMetric"
-          @update:family="selectedFamily = $event"
           @update:targetModel="selectedTargetModel = $event"
+          @update:draftModel="selectedDraftModel = $event"
           @update:benchmark="selectedBenchmark = $event"
           @update:metric="selectedMetric = $event"
         />
@@ -46,12 +43,12 @@
       <div v-else-if="currentData.length > 0" class="content-wrapper">
         <div class="stats-overview">
           <div class="stat-card">
-            <span class="stat-label">Model Family</span>
-            <span class="stat-value">{{ selectedFamily }}</span>
+            <span class="stat-label">Target Model</span>
+            <span class="stat-value">{{ selectedTargetModel === 'all' ? 'All' : selectedTargetModel }}</span>
           </div>
           <div class="stat-card">
-            <span class="stat-label">Target Models</span>
-            <span class="stat-value">{{ uniqueModels.length }}</span>
+            <span class="stat-label">Draft Models</span>
+            <span class="stat-value">{{ draftModels.length }}</span>
           </div>
           <div class="stat-card">
             <span class="stat-label">Configurations</span>
@@ -66,7 +63,6 @@
               :data="currentData"
               :benchmark="selectedBenchmark"
               :metric="selectedMetric"
-              :modelFamily="selectedFamily"
             />
           </div>
         </div>
@@ -101,7 +97,7 @@
           </svg>
         </div>
         <h3>No Data Available</h3>
-        <p>No benchmark data found for {{ selectedFamily }}</p>
+        <p>No benchmark data found for {{ selectedTargetModel === 'all' ? 'selected models' : selectedTargetModel }}</p>
       </div>
 
     </div>
@@ -120,14 +116,13 @@ import BenchmarkTable from './BenchmarkTable.vue';
 import {
   loadAllData,
   processModelData,
-  getModelFamilies,
-  extractUniqueTargetModels
+  getTargetModels
 } from '../utils/dataProcessor';
 
 const loading = ref(true);
 const allProcessedData = ref({});
-const selectedFamily = ref('Kimi-K2-Instruct');
 const selectedTargetModel = ref('all');
+const selectedDraftModel = ref('all');
 const selectedBenchmark = ref('all');
 const selectedMetric = ref('throughput');
 
@@ -139,48 +134,48 @@ const metricOptions = [
   { value: 'speedup', label: 'Speedup vs Baseline' }
 ];
 
-const modelFamilies = computed(() => getModelFamilies(allProcessedData.value));
+const targetModels = computed(() => getTargetModels(allProcessedData.value));
 
-const uniqueModels = computed(() => {
-  const familyData = allProcessedData.value[selectedFamily.value] || [];
-  return extractUniqueTargetModels(familyData);
+const draftModels = computed(() => {
+  const targetData = allProcessedData.value[selectedTargetModel.value] || [];
+  return [...new Set(targetData.map(d => d.draftModel).filter(Boolean))];
 });
 
 const currentData = computed(() => {
-  const familyData = allProcessedData.value[selectedFamily.value] || [];
+  const targetData = allProcessedData.value[selectedTargetModel.value] || [];
 
-  if (selectedTargetModel.value && selectedTargetModel.value !== 'all') {
-    return familyData.filter(d => d.targetModel === selectedTargetModel.value);
+  if (selectedDraftModel.value && selectedDraftModel.value !== 'all') {
+    return targetData.filter(d => d.draftModel === selectedDraftModel.value);
   }
 
-  return familyData;
+  return targetData;
 });
 
-// Update target model selection when family changes
-watch([selectedFamily, uniqueModels], ([newFamily, newModels]) => {
-    if (newModels && newModels.length > 0) {
-        // Default to the first target model to avoid mixing data
-        if (!newModels.includes(selectedTargetModel.value)) {
-             selectedTargetModel.value = newModels[0];
-        }
-    } else {
-        selectedTargetModel.value = 'all';
+// Reset draft model selection when target model changes
+watch(selectedTargetModel, (newTargetModel) => {
+  if (newTargetModel === 'all') {
+    selectedDraftModel.value = 'all';
+  } else {
+    const newDraftModels = draftModels.value;
+    if (!newDraftModels.includes(selectedDraftModel.value)) {
+      selectedDraftModel.value = 'all';
     }
-}, { immediate: true });
+  }
+});
 
 onMounted(async () => {
   try {
     const jsonData = await loadAllData();
 
-    // Process each model family from JSON
-    for (const [modelFamily, modelData] of Object.entries(jsonData)) {
-      allProcessedData.value[modelFamily] = processModelData(modelData);
+    // Process each target model from JSON (top-level keys are target models)
+    for (const [targetModel, modelData] of Object.entries(jsonData)) {
+      allProcessedData.value[targetModel] = processModelData(modelData, targetModel);
     }
 
-    // Set default family if available
-    const families = Object.keys(allProcessedData.value);
-    if (families.length > 0 && !families.includes(selectedFamily.value)) {
-      selectedFamily.value = families[0];
+    // Set default target model if available
+    const models = Object.keys(allProcessedData.value);
+    if (models.length > 0 && !models.includes(selectedTargetModel.value)) {
+      selectedTargetModel.value = models[0];
     }
 
     loading.value = false;
@@ -214,7 +209,7 @@ onMounted(async () => {
 
 .header-content {
   display: flex;
-  flex-direction: row;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
   gap: 1rem;
@@ -223,35 +218,21 @@ onMounted(async () => {
 .brand {
   display: flex;
   align-items: center;
-  gap: 12px;
-}
-
-.logo-icon {
-  width: auto;
-  height: 60px; /* Adjusted for better proportion with title */
-  display: flex;
-  align-items: center;
   justify-content: center;
 }
 
-.brand-name {
-  font-family: 'Space Grotesk', sans-serif; /* Modern tech/space font */
-  font-weight: 700;
-  font-size: 2.2rem;
-  color: var(--color-text-main);
-  letter-spacing: -0.03em; /* Tighter tracking for Grotesk look */
+.main-logo {
+  max-width: 500px;
+  width: auto;
+  height: 100px;
+  object-fit: contain;
 }
 
-h1 {
-  font-family: var(--font-display);
-  font-weight: 700;
-  font-size: 2.8rem;
-  line-height: 1;
-  background: linear-gradient(135deg, var(--color-text-main) 0%, var(--color-primary) 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  margin: 0;
-  letter-spacing: -0.02em;
+.config-legend {
+  font-size: 0.875rem;
+  color: var(--color-text-secondary);
+  font-weight: 500;
+  margin-top: 8px;
 }
 
 .subtitle {

@@ -32,8 +32,7 @@ use([
 const props = defineProps({
   data: { type: Array, required: true },
   benchmark: { type: String, default: 'MTBench' },
-  metric: { type: String, default: 'throughput' },
-  modelFamily: { type: String, default: '' }
+  metric: { type: String, default: 'throughput' }
 });
 
 const chartOption = computed(() => {
@@ -129,7 +128,7 @@ const chartOption = computed(() => {
                 const baseline = d.baseline && d.baseline[b] ? d.baseline[b][metricKey] : null;
                 return baseline ? parseFloat((val / baseline).toFixed(2)) : 0;
             }
-            return val;
+            return typeof val === 'number' ? parseFloat(val.toFixed(2)) : val;
         });
 
         series.push({
@@ -144,7 +143,10 @@ const chartOption = computed(() => {
                 show: true,
                 position: 'top',
                 fontSize: 9,
-                formatter: '{c}',
+                formatter: (params) => {
+                    const val = params.value;
+                    return typeof val === 'number' ? val.toFixed(2) : val;
+                },
                 distance: 2
             }
         });
@@ -160,7 +162,7 @@ const chartOption = computed(() => {
         const baseline = d.baseline && d.baseline[benchmarksList[0]] ? d.baseline[benchmarksList[0]][metricKey] : null;
         return baseline ? parseFloat((val / baseline).toFixed(2)) : 0;
       }
-      return val;
+      return typeof val === 'number' ? parseFloat(val.toFixed(2)) : val;
     });
 
     series.push({
@@ -178,7 +180,10 @@ const chartOption = computed(() => {
       label: {
         show: xAxisData.length <= 15,
         position: 'top',
-        formatter: '{c}',
+        formatter: (params) => {
+            const val = params.value;
+            return typeof val === 'number' ? val.toFixed(2) : val;
+        },
         fontSize: 10,
         color: '#64748b'
       }
@@ -186,8 +191,9 @@ const chartOption = computed(() => {
   }
 
   const displayTitle = isAllBenchmarks
-    ? `Hardware: H200 ${parallelConfigText} | Metric: Throughput (tokens/s)`
-    : `${benchmarksList[0]} Performance`;
+    ? `Hardware: H200 ${parallelConfigText} | Metric: Throughput (tokens/s) | Config (batch_size-step-topk-nums_draft_tokens)`
+    : `${benchmarksList[0]} Performance | Config (batch_size-step-topk-nums_draft_tokens)`;
+
 
   return {
     textStyle: { fontFamily: 'Inter, sans-serif' },

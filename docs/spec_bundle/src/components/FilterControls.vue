@@ -3,16 +3,16 @@
     <div class="filter-grid">
 
       <div class="filter-item">
-        <label for="modelFamily">Model Family</label>
+        <label for="targetModel">Target Model</label>
         <div class="select-wrapper">
           <select
-            id="modelFamily"
-            :value="selectedFamily"
-            @change="$emit('update:family', $event.target.value)"
+            id="targetModel"
+            :value="selectedTargetModel"
+            @change="$emit('update:targetModel', $event.target.value)"
           >
-            <!-- No 'All Models' option as per design -->
-            <option v-for="family in modelFamilies" :key="family" :value="family">
-              {{ family }}
+            <option value="all">All Models</option>
+            <option v-for="model in targetModels" :key="model" :value="model">
+              {{ model }}
             </option>
           </select>
           <div class="select-arrow">
@@ -24,15 +24,16 @@
       </div>
 
       <div class="filter-item">
-        <label for="targetModel">Target Model</label>
+        <label for="draftModel">Draft Model</label>
         <div class="select-wrapper">
           <select
-            id="targetModel"
-            :value="selectedTargetModel"
-            @change="$emit('update:targetModel', $event.target.value)"
+            id="draftModel"
+            :value="selectedDraftModel"
+            @change="$emit('update:draftModel', $event.target.value)"
           >
-            <option v-for="model in targetModels" :key="model" :value="model">
-              {{ model }}
+            <option value="all">All Draft Models</option>
+            <option v-for="model in draftModels" :key="model" :value="model">
+              {{ model === 'None' ? 'Baseline (No Draft)' : model }}
             </option>
           </select>
           <div class="select-arrow">
@@ -89,17 +90,17 @@
 
 <script setup>
 defineProps({
-  modelFamilies: { type: Array, required: true },
-  selectedFamily: { type: String, required: true },
-  targetModels: { type: Array, default: () => [] },
+  targetModels: { type: Array, required: true },
   selectedTargetModel: { type: String, default: 'all' },
+  draftModels: { type: Array, default: () => [] },
+  selectedDraftModel: { type: String, default: 'all' },
   benchmarks: { type: Array, required: true },
   selectedBenchmark: { type: String, required: true },
   metrics: { type: Array, required: true },
   selectedMetric: { type: String, required: true }
 });
 
-defineEmits(['update:family', 'update:targetModel', 'update:benchmark', 'update:metric']);
+defineEmits(['update:targetModel', 'update:draftModel', 'update:benchmark', 'update:metric']);
 </script>
 
 <style scoped>
@@ -113,7 +114,7 @@ defineEmits(['update:family', 'update:targetModel', 'update:benchmark', 'update:
 
 .filter-grid {
   display: grid;
-  grid-template-columns: repeat(4, 1fr); /* Updated to 4 cols */
+  grid-template-columns: repeat(4, 1fr);
   gap: 24px;
 }
 

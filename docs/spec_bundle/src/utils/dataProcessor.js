@@ -14,10 +14,10 @@ export function calculateSpeedup(specValue, baselineValue) {
   return (specValue / baselineValue).toFixed(2);
 }
 
-export function processModelData(modelData) {
-  if (!modelData) return [];
+export function processModelData(modelData, targetModelName) {
+  if (!modelData || !targetModelName) return [];
 
-  // Map to hold aggregated entries by unique key (model + config)
+  // Map to hold aggregated entries by unique key (draftModel + config)
   const entriesMap = new Map();
 
   // Iterate through each benchmark in the model
@@ -35,13 +35,19 @@ export function processModelData(modelData) {
       metrics.forEach(metric => {
         const isBaseline = metric.Name === 'Wihtout EAGLE3';
         const config = isBaseline ? 'baseline' : `${batch_size}-${steps}-${topk}-${num_draft_tokens}`;
-        const key = `${metric.Name}|${config}`;
+
+        // draftModel is the Name from metrics array
+        const draftModel = isBaseline ? 'None' : metric.Name;
+
+        // Use a combination of draftModel and config as the key
+        // This ensures baseline and EAGLE3 configs are separate entries
+        const key = `${draftModel}|${config}`;
 
         // Get or create entry
         if (!entriesMap.has(key)) {
           entriesMap.set(key, {
-            targetModel: metric.Name,
-            draftModel: isBaseline ? 'None' : metric.Name,
+            targetModel: targetModelName,
+            draftModel: draftModel,
             config,
             batch_size,
             steps,
@@ -74,7 +80,7 @@ export function processModelData(modelData) {
   return Array.from(entriesMap.values());
 }
 
-export function getModelFamilies(allData) {
+export function getTargetModels(allData) {
   return Object.keys(allData);
 }
 

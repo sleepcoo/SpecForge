@@ -91,6 +91,18 @@ function formatDraftModel(model) {
   return model.split('/').pop() || model;
 }
 
+function formatConfigDetails(row) {
+  if (row.config === 'baseline' || !row.config) {
+    return 'Baseline Configuration';
+  }
+  const parts = [];
+  if (row.batch_size !== undefined) parts.push(`batch_size: ${row.batch_size}`);
+  if (row.steps !== undefined) parts.push(`steps: ${row.steps}`);
+  if (row.topk !== undefined) parts.push(`topk: ${row.topk}`);
+  if (row.num_draft_tokens !== undefined) parts.push(`num_draft_tokens: ${row.num_draft_tokens}`);
+  return parts.length > 0 ? parts.join(', ') : row.config;
+}
+
 function getDraftModelClass(model) {
   if (!model || model === '-' || model === 'None') return 'badge-baseline';
   if (model.includes('SpecBundle')) return 'badge-spec';
@@ -100,8 +112,7 @@ function getDraftModelClass(model) {
 
 function formatValue(value) {
   if (value === null || value === undefined) return '-';
-  // Check if integer
-  if (Number.isInteger(value)) return value;
+  // Always format to 2 decimal places
   return typeof value === 'number' ? value.toFixed(2) : value;
 }
 
@@ -229,6 +240,28 @@ th.sticky-col {
   font-weight: 600;
   color: var(--color-text-main);
   min-width: 180px;
+}
+
+.config-cell {
+  min-width: 120px;
+}
+
+.config-display {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.config-short {
+  font-weight: 600;
+  color: var(--color-text-main);
+  font-size: 0.875rem;
+}
+
+.config-details {
+  font-size: 0.75rem;
+  color: var(--color-text-secondary);
+  line-height: 1.3;
 }
 
 /* Badges */
