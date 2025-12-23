@@ -10,7 +10,6 @@
             :value="selectedTargetModel"
             @change="$emit('update:targetModel', $event.target.value)"
           >
-            <option value="all">All Models</option>
             <option v-for="model in targetModels" :key="model" :value="model">
               {{ model }}
             </option>

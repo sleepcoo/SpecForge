@@ -5,7 +5,7 @@
 
       <!-- Header / Hero -->
       <header class="header">
-        <a href="https://docs.sglang.io/SpecForge/" target="_blank" rel="noopener noreferrer" class="back-to-docs">
+        <a href="https://docs.sglang.io/SpecForge/" class="back-to-docs">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M19 12H5M12 19l-7-7 7-7"/>
           </svg>
@@ -61,7 +61,7 @@
         <div class="stats-overview">
           <div class="stat-card">
             <span class="stat-label">Target Model</span>
-            <span class="stat-value">{{ selectedTargetModel === 'all' ? 'All' : removeSGLangPrefix(selectedTargetModel) }}</span>
+            <span class="stat-value">{{ removeSGLangPrefix(selectedTargetModel) }}</span>
           </div>
           <div class="stat-card">
             <span class="stat-label">Draft Models</span>
@@ -115,7 +115,7 @@
           </svg>
         </div>
         <h3>No Data Available</h3>
-        <p>No benchmark data found for {{ selectedTargetModel === 'all' ? 'selected models' : selectedTargetModel }}</p>
+        <p>No benchmark data found for {{ selectedTargetModel }}</p>
       </div>
 
     </div>
@@ -140,7 +140,7 @@ import {
 
 const loading = ref(true);
 const allProcessedData = ref({});
-const selectedTargetModel = ref('all');
+const selectedTargetModel = ref('');
 const selectedDraftModel = ref('all');
 const selectedBenchmark = ref('all');
 const selectedMetric = ref('throughput');
@@ -156,6 +156,7 @@ const metricOptions = [
 const targetModels = computed(() => getTargetModels(allProcessedData.value));
 
 const draftModels = computed(() => {
+  if (!selectedTargetModel.value) return [];
   const targetData = allProcessedData.value[selectedTargetModel.value] || [];
   return [...new Set(targetData.map(d => d.draftModel).filter(Boolean))];
 });
@@ -172,9 +173,7 @@ const currentData = computed(() => {
 
 // Reset draft model selection when target model changes
 watch(selectedTargetModel, (newTargetModel) => {
-  if (newTargetModel === 'all') {
-    selectedDraftModel.value = 'all';
-  } else {
+  if (newTargetModel) {
     const newDraftModels = draftModels.value;
     if (!newDraftModels.includes(selectedDraftModel.value)) {
       selectedDraftModel.value = 'all';
@@ -193,7 +192,7 @@ onMounted(async () => {
 
     // Set default target model if available
     const models = Object.keys(allProcessedData.value);
-    if (models.length > 0 && !models.includes(selectedTargetModel.value)) {
+    if (models.length > 0) {
       selectedTargetModel.value = models[0];
     }
 
