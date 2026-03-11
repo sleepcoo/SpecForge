@@ -3,10 +3,12 @@ import logging
 import os
 import re
 from contextlib import contextmanager
+from pathlib import Path
 
 import torch
 import torch.distributed as dist
 from torch.distributed._tensor import DTensor, Shard, distribute_tensor
+from huggingface_hub import snapshot_download
 from transformers import AutoConfig, PretrainedConfig
 
 logger = logging.getLogger(__name__)
@@ -47,6 +49,44 @@ def load_config_from_file(config_path: str):
         config = json.load(f)
 
     return PretrainedConfig.from_dict(config)
+
+
+def load_raw_model_config_dict(model_path: str, cache_dir: str = None) -> dict:
+    """Load raw HF config JSON, supporting both local paths and repo IDs."""
+    if os.path.isdir(model_path):
+        config_path = Path(model_path) / "config.json"
+        if not config_path.exists():
+            raise FileNotFoundError(f"config.json not found in {model_path}")
+        with config_path.open("r", encoding="utf-8") as f:
+            return json.load(f)
+
+    local_cache_path = snapshot_download(repo_id=model_path, cache_dir=cache_dir)
+    return load_raw_model_config_dict(local_cache_path, cache_dir=cache_dir)
+
+
+def get_nested_config_value(config_dict: dict, key: str):
+    """Prefer text_config for multimodal/text-wrapped checkpoints like Qwen3.5."""
+    text_config = config_dict.get("text_config")
+    if isinstance(text_config, dict) and key in text_config:
+        return text_config[key]
+    return config_dict.get(key)
+
+
+def choose_draft_template_config_path(
+    target_model_path: str, raw_config: dict, project_root: str
+) -> str:
+    """Pick a closer template when the target model family is known."""
+    model_hint = target_model_path.lower()
+    model_type = str(raw_config.get("model_type", "")).lower()
+    text_model_type = str(raw_config.get("text_config", {}).get("model_type", "")).lower()
+
+    template_name = "llama3-8B-eagle3.json"
+    if "qwen" in model_hint or "qwen" in model_type or "qwen" in text_model_type:
+        template_name = "qwen3-8b-eagle3.json"
+    elif "phi" in model_hint or "phi" in model_type or "phi" in text_model_type:
+        template_name = "phi4-eagle3.json"
+
+    return os.path.join(project_root, "configs", template_name)
 
 
 def print_with_rank(message):
@@ -107,8 +147,20 @@ def generate_draft_model_config(
     Returns:
         dict: Generated draft model config dictionary
     """
-    # Get target model config
-    target_config = AutoConfig.from_pretrained(target_model_path, cache_dir=cache_dir)
+    raw_target_config = load_raw_model_config_dict(target_model_path, cache_dir=cache_dir)
+
+    # Get target model config. Fall back to raw JSON for model types unsupported by the
+    # installed Transformers version.
+    try:
+        target_config = AutoConfig.from_pretrained(
+            target_model_path,
+            cache_dir=cache_dir,
+            trust_remote_code=True,
+        )
+    except Exception:
+        target_config = PretrainedConfig.from_dict(
+            raw_target_config.get("text_config", raw_target_config)
+        )
 
     # If no template specified, use default llama3-8B-eagle3.json
     if template_config_path is None:
@@ -117,8 +169,10 @@ def generate_draft_model_config(
 
         script_dir = os.path.dirname(os.path.abspath(sys.argv[0]))
         project_root = os.path.dirname(script_dir)  # Go up one level from scripts/
-        template_config_path = os.path.join(
-            project_root, "configs", "llama3-8B-eagle3.json"
+        template_config_path = choose_draft_template_config_path(
+            target_model_path=target_model_path,
+            raw_config=raw_target_config,
+            project_root=project_root,
         )
 
     # Read template config
@@ -147,8 +201,12 @@ def generate_draft_model_config(
 
     # Copy parameters from target model to draft config
     for target_param, draft_param in param_mappings.items():
+        value = None
         if hasattr(target_config, target_param):
             value = getattr(target_config, target_param)
+        if value is None:
+            value = get_nested_config_value(raw_target_config, target_param)
+        if value is not None:
             # Special handling for torch_dtype to make it JSON serializable
             if target_param == "torch_dtype" and isinstance(value, torch.dtype):
                 value = str(value).replace("torch.", "")
@@ -163,6 +221,8 @@ def generate_draft_model_config(
         target_config.text_config, "hidden_size"
     ):
         target_hidden_size = target_config.text_config.hidden_size
+    elif get_nested_config_value(raw_target_config, "hidden_size") is not None:
+        target_hidden_size = get_nested_config_value(raw_target_config, "hidden_size")
     if target_hidden_size is not None:
         draft_config["target_hidden_size"] = target_hidden_size
 
