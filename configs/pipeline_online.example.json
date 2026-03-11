@@ -29,6 +29,17 @@
       "server_address": [
         "localhost:30000"
       ],
+      "server_bootstrap": {
+        "require_all": true,
+        "ready_timeout_sec": 600,
+        "poll_interval_sec": 5,
+        "entries": [
+          {
+            "address": "localhost:30000",
+            "launch_cmd": "python3 -m sglang.launch_server --model Qwen/Qwen3-8B --dtype bfloat16 --mem-frac 0.8 --port 30000"
+          }
+        ]
+      },
       "concurrency": 64,
       "max_tokens": 4096,
       "temperature": 0.7,

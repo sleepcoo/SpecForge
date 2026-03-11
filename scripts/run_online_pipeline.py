@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 """SpecForge online training orchestrator.
 
-This script orchestrates online training in three phases:
+This script orchestrates online training in four phases:
 1) Prepare data
-2) Regenerate data (optional)
-3) Train draft model (EAGLE3 or DFlash)
+2) Regen server preflight/bootstrap (optional)
+3) Regenerate data (optional)
+4) Train draft model (EAGLE3 or DFlash)
 
 It also provides:
 - Parallel config planning (local/ssh GPU probing)
@@ -627,6 +628,7 @@ def build_regen_command(
     python_bin: str,
     input_path: str,
     output_path: str,
+    server_addresses: Optional[Sequence[str]] = None,
 ) -> List[str]:
     regen = spec.get("data", {}).get("regen", {})
     if not regen.get("enabled", False):
@@ -638,9 +640,13 @@ def build_regen_command(
             "regen requires `data.regen.model` or models.target_model_path"
         )
 
-    server_address = regen.get("server_address")
+    configured_server_address = regen.get("server_address")
+    if server_addresses is None:
+        server_address = configured_server_address
+    else:
+        server_address = list(server_addresses)
     if not server_address:
-        raise ValueError("regen requires `data.regen.server_address` list")
+        raise ValueError("regen requires at least one server address")
 
     cmd = [
         python_bin,
@@ -675,6 +681,420 @@ def build_regen_command(
         cmd.extend(["--num-samples", str(regen["num_samples"])])
 
     return cmd
+
+
+def normalize_server_addresses(raw: Any) -> List[str]:
+    if raw is None:
+        return []
+
+    values: List[Any]
+    if isinstance(raw, list):
+        values = raw
+    else:
+        values = [raw]
+
+    normalized: List[str] = []
+    seen: set = set()
+    for value in values:
+        addr = str(value).strip()
+        if not addr:
+            continue
+
+        addr = re.sub(r"^https?://", "", addr)
+        if "/" in addr:
+            raise ValueError(
+                f"Invalid server address `{addr}`. Expected host:port without path."
+            )
+        if ":" not in addr:
+            raise ValueError(
+                f"Invalid server address `{addr}`. Expected format host:port."
+            )
+
+        host, port = addr.rsplit(":", 1)
+        if not host or not port.isdigit():
+            raise ValueError(
+                f"Invalid server address `{addr}`. Expected format host:port."
+            )
+
+        if addr in seen:
+            continue
+        seen.add(addr)
+        normalized.append(addr)
+
+    return normalized
+
+
+def sanitize_filename_fragment(text: str) -> str:
+    return re.sub(r"[^a-zA-Z0-9._-]+", "_", text)
+
+
+def probe_regen_server(
+    runner: CommandRunner,
+    python_bin: str,
+    address: str,
+    timeout_sec: int,
+) -> Tuple[bool, str]:
+    probe_code = (
+        "import sys\n"
+        "from urllib.request import urlopen\n"
+        "addr = sys.argv[1]\n"
+        "timeout = float(sys.argv[2])\n"
+        "url = f'http://{addr}/v1/models'\n"
+        "try:\n"
+        "    with urlopen(url, timeout=timeout) as resp:\n"
+        "        status = getattr(resp, 'status', 200)\n"
+        "        print(f'status={status}')\n"
+        "        raise SystemExit(0 if 200 <= status < 300 else 1)\n"
+        "except Exception as exc:\n"
+        "    print(str(exc))\n"
+        "    raise SystemExit(1)\n"
+    )
+    rc, out, err = runner.run_capture(
+        [python_bin, "-c", probe_code, address, str(timeout_sec)],
+        timeout_sec=max(5, timeout_sec + 3),
+    )
+    detail = (out or err or "").strip()
+    if not detail:
+        detail = f"exit_code={rc}"
+    return rc == 0, detail
+
+
+def launch_regen_server(
+    runner: CommandRunner,
+    launch_cmd: str,
+    log_path: Path,
+    timeout_sec: int = 20,
+) -> Tuple[Optional[str], str, str]:
+    if runner.mode == "ssh":
+        launch_log_path = f"/tmp/{log_path.name}"
+    else:
+        ensure_dir(log_path.parent)
+        launch_log_path = str(log_path)
+
+    shell_cmd = f"nohup {launch_cmd} > {shlex.quote(launch_log_path)} 2>&1 < /dev/null & echo $!"
+    rc, out, err = runner.run_capture(["sh", "-lc", shell_cmd], timeout_sec=timeout_sec)
+    detail = (out or err or "").strip()
+    if rc != 0:
+        return None, detail or f"exit_code={rc}", launch_log_path
+
+    pid = ""
+    if out.strip():
+        pid = out.strip().splitlines()[-1]
+    return (pid or None), detail or "launched", launch_log_path
+
+
+def run_regen_server_preflight_step(
+    step_index: int,
+    spec: Mapping[str, Any],
+    runner: CommandRunner,
+    state: StateStore,
+    notifier: PipelineNotifier,
+    logs_dir: Path,
+    summaries_dir: Path,
+    run_id: str,
+    dry_run: bool,
+    python_bin: str,
+) -> List[str]:
+    step_name = "REGEN_SERVER_PREFLIGHT"
+    started_at = time.time()
+    log_path = logs_dir / f"step_{step_index:02d}_{step_name.lower()}.log"
+    summary_path = (
+        summaries_dir / f"step_{step_index:02d}_{step_name.lower()}_summary.json"
+    )
+    log_lines: List[str] = []
+
+    regen_cfg = spec.get("data", {}).get("regen", {})
+    requested_addresses = normalize_server_addresses(regen_cfg.get("server_address"))
+    if not requested_addresses:
+        raise ValueError(
+            "regen requires `data.regen.server_address` with at least one host:port"
+        )
+
+    bootstrap_cfg = regen_cfg.get("server_bootstrap", {})
+    if bootstrap_cfg is None:
+        bootstrap_cfg = {}
+    if not isinstance(bootstrap_cfg, dict):
+        raise ValueError("`data.regen.server_bootstrap` must be an object when set")
+
+    require_all = bool(bootstrap_cfg.get("require_all", True))
+    ready_timeout_sec = max(1, int(bootstrap_cfg.get("ready_timeout_sec", 600)))
+    poll_interval_sec = max(1, int(bootstrap_cfg.get("poll_interval_sec", 5)))
+    probe_timeout_sec = max(1, int(bootstrap_cfg.get("probe_timeout_sec", 5)))
+
+    entries_raw = bootstrap_cfg.get("entries", [])
+    if entries_raw is None:
+        entries_raw = []
+    if not isinstance(entries_raw, list):
+        raise ValueError("`data.regen.server_bootstrap.entries` must be a list")
+
+    entry_by_address: Dict[str, Dict[str, str]] = {}
+    for idx, item in enumerate(entries_raw):
+        if not isinstance(item, dict):
+            raise ValueError(
+                f"`data.regen.server_bootstrap.entries[{idx}]` must be an object"
+            )
+        address_raw = item.get("address")
+        launch_cmd = str(item.get("launch_cmd", "")).strip()
+        if address_raw is None:
+            raise ValueError(
+                f"`data.regen.server_bootstrap.entries[{idx}].address` is required"
+            )
+        if not launch_cmd:
+            raise ValueError(
+                f"`data.regen.server_bootstrap.entries[{idx}].launch_cmd` is required"
+            )
+
+        parsed = normalize_server_addresses(address_raw)
+        if len(parsed) != 1:
+            raise ValueError(
+                f"`data.regen.server_bootstrap.entries[{idx}].address` must be one host:port"
+            )
+        entry_by_address[parsed[0]] = {"launch_cmd": launch_cmd}
+
+    state.set_step(step_name, "running")
+    state.append_history("step_started", {"step": step_name, "index": step_index})
+    notifier.send(
+        event="STEP_STARTED",
+        title=f"{step_name} started",
+        message=f"Started step `{step_name}`.",
+        context={"step": step_name, "index": step_index},
+        force=True,
+        dedupe_key=f"STEP_STARTED:{step_name}",
+    )
+
+    launched: List[Dict[str, Any]] = []
+    initial_probe: Dict[str, Dict[str, Any]] = {}
+    final_probe: Dict[str, Dict[str, Any]] = {}
+    available_addresses: List[str] = []
+    unavailable_addresses: List[str] = []
+
+    def finalize_and_maybe_fail(error_message: Optional[str]) -> List[str]:
+        ensure_dir(log_path.parent)
+        if not log_lines:
+            log_lines.append("No preflight logs generated.")
+        log_path.write_text("\n".join(log_lines) + "\n", encoding="utf-8")
+
+        returncode = 0 if error_message is None else 1
+        summary = {
+            "step": step_name,
+            "index": step_index,
+            "command": "internal: regen server preflight",
+            "returncode": returncode,
+            "duration_sec": round(time.time() - started_at, 4),
+            "log_path": str(log_path),
+            "finished_at": utc_now_iso(),
+            "run_id": run_id,
+            "dry_run": dry_run,
+            "require_all": require_all,
+            "requested_addresses": requested_addresses,
+            "available_addresses": available_addresses,
+            "unavailable_addresses": unavailable_addresses,
+            "bootstrap_entries": sorted(entry_by_address.keys()),
+            "launched": launched,
+            "initial_probe": initial_probe,
+            "final_probe": final_probe,
+        }
+        write_json(summary_path, summary)
+        state.set_artifact(f"step_{step_index:02d}_summary", str(summary_path))
+        state.set_artifact(f"step_{step_index:02d}_log", str(log_path))
+
+        if error_message is not None:
+            state.set_step(step_name, "failed")
+            notifier.send(
+                event="STEP_FAILED",
+                title=f"{step_name} failed",
+                message=error_message,
+                context={
+                    "step": step_name,
+                    "returncode": 1,
+                    "log_path": str(log_path),
+                    "summary_path": str(summary_path),
+                },
+                force=True,
+                dedupe_key=f"STEP_FAILED:{step_name}",
+            )
+            raise PipelineError(error_message)
+
+        state.set_step(step_name, "completed")
+        state.append_history(
+            "step_completed",
+            {
+                "step": step_name,
+                "index": step_index,
+                "duration_sec": round(time.time() - started_at, 4),
+            },
+        )
+        notifier.send(
+            event="STEP_COMPLETED",
+            title=f"{step_name} completed",
+            message=(
+                f"Step `{step_name}` completed. "
+                f"available={len(available_addresses)}, unavailable={len(unavailable_addresses)}."
+            ),
+            context={
+                "step": step_name,
+                "available_addresses": available_addresses,
+                "unavailable_addresses": unavailable_addresses,
+                "log_path": str(log_path),
+                "summary_path": str(summary_path),
+            },
+            force=True,
+            dedupe_key=f"STEP_COMPLETED:{step_name}",
+        )
+        return available_addresses
+
+    log_lines.append(
+        f"Preflight start: require_all={require_all}, dry_run={dry_run}, requested={requested_addresses}"
+    )
+    if dry_run:
+        available_addresses.extend(requested_addresses)
+        log_lines.append("Dry-run enabled: skipping server probing and bootstrap.")
+        state.set_metric(
+            "regen_server_preflight",
+            {
+                "requested": requested_addresses,
+                "available": available_addresses,
+                "unavailable": unavailable_addresses,
+                "dry_run": True,
+            },
+        )
+        return finalize_and_maybe_fail(None)
+
+    availability_map: Dict[str, bool] = {}
+    for address in requested_addresses:
+        ok, detail = probe_regen_server(
+            runner=runner,
+            python_bin=python_bin,
+            address=address,
+            timeout_sec=probe_timeout_sec,
+        )
+        availability_map[address] = ok
+        initial_probe[address] = {"ok": ok, "detail": detail}
+        log_lines.append(
+            f"Initial probe {address}: {'OK' if ok else 'FAIL'} ({detail})"
+        )
+
+    for address in requested_addresses:
+        if availability_map.get(address, False):
+            continue
+
+        entry = entry_by_address.get(address)
+        if entry is None:
+            log_lines.append(
+                f"{address}: unavailable and no bootstrap launch_cmd configured."
+            )
+            continue
+
+        server_log_path = (
+            logs_dir / f"regen_server_{sanitize_filename_fragment(address)}.log"
+        )
+        pid, launch_detail, launch_log_path = launch_regen_server(
+            runner=runner,
+            launch_cmd=entry["launch_cmd"],
+            log_path=server_log_path,
+        )
+        launched_item: Dict[str, Any] = {
+            "address": address,
+            "launch_cmd": entry["launch_cmd"],
+            "pid": pid,
+            "server_log_path": launch_log_path,
+            "launch_detail": launch_detail,
+        }
+        launched.append(launched_item)
+
+        if pid is None:
+            log_lines.append(f"Launch failed {address}: {launch_detail}")
+            continue
+
+        log_lines.append(
+            f"Launched {address} with pid={pid}; waiting up to {ready_timeout_sec}s."
+        )
+        deadline = time.time() + ready_timeout_sec
+        while time.time() < deadline:
+            ok, detail = probe_regen_server(
+                runner=runner,
+                python_bin=python_bin,
+                address=address,
+                timeout_sec=probe_timeout_sec,
+            )
+            if ok:
+                availability_map[address] = True
+                launched_item["ready"] = True
+                launched_item["ready_detail"] = detail
+                log_lines.append(f"{address} became ready ({detail}).")
+                break
+            time.sleep(poll_interval_sec)
+
+        if not availability_map.get(address, False):
+            launched_item["ready"] = False
+            log_lines.append(f"{address} did not become ready before timeout.")
+
+    for address in requested_addresses:
+        ok, detail = probe_regen_server(
+            runner=runner,
+            python_bin=python_bin,
+            address=address,
+            timeout_sec=probe_timeout_sec,
+        )
+        final_probe[address] = {"ok": ok, "detail": detail}
+        if ok:
+            available_addresses.append(address)
+        else:
+            unavailable_addresses.append(address)
+
+    state.set_metric(
+        "regen_server_preflight",
+        {
+            "requested": requested_addresses,
+            "available": available_addresses,
+            "unavailable": unavailable_addresses,
+            "require_all": require_all,
+            "dry_run": False,
+        },
+    )
+    state.set_artifact("regen_available_server_addresses", available_addresses)
+
+    if not available_addresses:
+        return finalize_and_maybe_fail(
+            "Regen server preflight failed: no available server addresses."
+        )
+
+    if require_all and unavailable_addresses:
+        return finalize_and_maybe_fail(
+            "Regen server preflight failed: unavailable addresses: "
+            + ", ".join(unavailable_addresses)
+        )
+
+    if unavailable_addresses:
+        log_lines.append(
+            "Continuing with partial server availability (require_all=false): "
+            + ", ".join(unavailable_addresses)
+        )
+    return finalize_and_maybe_fail(None)
+
+
+def validate_regen_is_required(spec: Mapping[str, Any]) -> None:
+    data_cfg = spec.get("data", {})
+    if not isinstance(data_cfg, dict):
+        raise ValueError("`data` must be an object.")
+
+    regen_cfg = data_cfg.get("regen")
+    if not isinstance(regen_cfg, dict):
+        raise ValueError(
+            "Online pipeline requires regen. Please configure `data.regen`."
+        )
+
+    if not bool(regen_cfg.get("enabled", False)):
+        raise ValueError(
+            "Online pipeline requires regen. Please set `data.regen.enabled=true`."
+        )
+
+    server_addresses = normalize_server_addresses(regen_cfg.get("server_address"))
+    if not server_addresses:
+        raise ValueError(
+            "Online pipeline requires regen server addresses. "
+            "Please set `data.regen.server_address` to at least one host:port."
+        )
 
 
 def append_tracking_args(cmd: List[str], tracking: Mapping[str, Any]) -> None:
@@ -1091,6 +1511,8 @@ def main() -> int:
             )
             return 0
 
+        validate_regen_is_required(spec)
+
         python_bin = args.python_bin
 
         # Step 1: prepare data (or use provided path)
@@ -1121,37 +1543,51 @@ def main() -> int:
 
         state.set_artifact("train_data_path", prepared_train_path)
 
-        # Step 2: regenerate data (optional)
+        # Step 2: regen server preflight + regenerate data (required)
         regen_cfg = spec.get("data", {}).get("regen", {})
         final_train_path = prepared_train_path
-        if regen_cfg.get("enabled", False):
-            step_index += 1
-            regen_output_path = str(
-                regen_cfg.get(
-                    "output_file_path",
-                    output_dir / "data" / "train_regen.jsonl",
-                )
+        step_index += 1
+        available_regen_addresses = run_regen_server_preflight_step(
+            step_index=step_index,
+            spec=spec,
+            runner=runner,
+            state=state,
+            notifier=notifier,
+            logs_dir=logs_dir,
+            summaries_dir=summaries_dir,
+            run_id=run_id,
+            dry_run=dry_run,
+            python_bin=python_bin,
+        )
+
+        step_index += 1
+        regen_output_path = str(
+            regen_cfg.get(
+                "output_file_path",
+                output_dir / "data" / "train_regen.jsonl",
             )
-            regen_cmd = build_regen_command(
-                spec=spec,
-                python_bin=python_bin,
-                input_path=prepared_train_path,
-                output_path=regen_output_path,
-            )
-            run_step(
-                step_index=step_index,
-                step_name="REGEN_DATA",
-                command=regen_cmd,
-                runner=runner,
-                state=state,
-                notifier=notifier,
-                logs_dir=logs_dir,
-                summaries_dir=summaries_dir,
-                run_id=run_id,
-                dry_run=dry_run,
-            )
-            final_train_path = regen_output_path
-            state.set_artifact("regen_output_path", final_train_path)
+        )
+        regen_cmd = build_regen_command(
+            spec=spec,
+            python_bin=python_bin,
+            input_path=prepared_train_path,
+            output_path=regen_output_path,
+            server_addresses=available_regen_addresses,
+        )
+        run_step(
+            step_index=step_index,
+            step_name="REGEN_DATA",
+            command=regen_cmd,
+            runner=runner,
+            state=state,
+            notifier=notifier,
+            logs_dir=logs_dir,
+            summaries_dir=summaries_dir,
+            run_id=run_id,
+            dry_run=dry_run,
+        )
+        final_train_path = regen_output_path
+        state.set_artifact("regen_output_path", final_train_path)
 
         # Step 3: train online
         step_index += 1

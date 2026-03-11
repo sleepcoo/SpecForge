@@ -1,6 +1,6 @@
 ---
 name: specforge-online-trainer
-description: Run end-to-end SpecForge online training with minimal manual operations (prepare data, optional regen, auto parallel planning, training, progress notifications, and run-state outputs). Use this when users want the agent to execute a full training run instead of manually editing config/sh scripts.
+description: Run end-to-end SpecForge online training with minimal manual operations (prepare data, mandatory regen server preflight and regen, auto parallel planning, training, progress notifications, and run-state outputs). Use this when users want the agent to execute a full training run instead of manually editing config/sh scripts.
 ---
 
 # SpecForge Online Trainer
@@ -34,13 +34,14 @@ Use this skill to execute one full online training run with SpecForge and reduce
 python3 scripts/run_online_pipeline.py --spec <spec.json> --plan-only
 ```
 
-3. Run full pipeline:
+3. Always call skill `specforge-regen-orchestrator` before training starts to ensure configured SGLang endpoints are reachable and regen data is produced.
+4. Run full pipeline:
 
 ```bash
 python3 scripts/run_online_pipeline.py --spec <spec.json>
 ```
 
-4. Check outputs:
+5. Check outputs:
 - `outputs/<run_id>/run_state.json`
 - `outputs/<run_id>/parallel_plan.json`
 - `outputs/<run_id>/summaries/step_*_summary.json`
@@ -57,3 +58,5 @@ python3 scripts/run_online_pipeline.py --spec <spec.json>
 - This skill only targets online mode.
 - Do not use hidden-state offline preparation in this workflow.
 - Preserve reproducibility: keep resolved spec and generated plans in output artifacts.
+- Regen is mandatory for this workflow; do not bypass it.
+- If regen server preflight fails, stop and report the missing server/bootstrap details.

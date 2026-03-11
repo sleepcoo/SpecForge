@@ -1,0 +1,4 @@
+interface:
+  display_name: "SpecForge Regen Orchestrator"
+  short_description: "Ensure SGLang server readiness and run regen deterministically"
+  default_prompt: "When regen is enabled, probe all configured SGLang addresses, start missing servers using configured launch commands, wait for readiness, and execute regenerate_train_data.py with fail-fast behavior instead of silently skipping unavailable ports."
