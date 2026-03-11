@@ -46,6 +46,17 @@ python3 scripts/run_online_pipeline.py --spec <spec.json>
 - `outputs/<run_id>/summaries/step_*_summary.json`
 - `outputs/<run_id>/logs/*.log`
 
+## Execution Expectations
+
+- Treat this skill as managed execution, not just fire-and-forget launch.
+- Prefer periodic monitoring over constant terminal attachment for long runs. Default policy: check `run_state.json` and recent logs every 20 minutes unless the user asks for a different interval.
+- On failure, first collect diagnosis context (`run_state.json`, failing step summary, failing log tail, recent launcher output, resolved spec, parallel plan).
+- A failed run must be diagnosed before any automatic restart. Do not restart first and analyze later.
+- If an LLM diagnostic hook or agent entrypoint is available in the environment, call it with the diagnosis context before deciding whether to restart.
+- If no automated LLM hook is available, stop automatic recovery after writing the diagnosis bundle and surface the failure context for user review or the next agent turn.
+- After a successful diagnosis, restart the pipeline from the same spec only when recovery is low-risk (`resume=true`, artifact paths still valid, no destructive cleanup needed).
+- Report step transitions and restart events concisely rather than continuously streaming logs.
+
 ## Notifications
 
 - Prefer webhook for real-time events.
