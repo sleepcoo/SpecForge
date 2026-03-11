@@ -72,24 +72,9 @@
     "wandb_key": null
   },
   "notifications": {
-    "enabled": true,
+    "enabled": false,
     "cooldown_sec": 600,
     "hooks": [
-      {
-        "type": "webhook",
-        "name": "ops_webhook",
-        "url": "https://example.com/hook",
-        "enabled": false,
-        "events": [
-          "RUN_STARTED",
-          "PARALLEL_PLAN_READY",
-          "STEP_STARTED",
-          "STEP_PROGRESS",
-          "STEP_COMPLETED",
-          "RUN_FAILED",
-          "RUN_COMPLETED"
-        ]
-      },
       {
         "type": "gmail",
         "name": "gmail_alert",

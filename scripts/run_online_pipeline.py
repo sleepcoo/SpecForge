@@ -11,7 +11,7 @@ It also provides:
 - Parallel config planning (local/ssh GPU probing)
 - State persistence (`run_state.json`)
 - Step summaries (`step_xx_summary.json`)
-- Event notifications via hook channels (webhook/smtp/gmail)
+- Event notifications via Gmail SMTP hook
 """
 
 from __future__ import annotations
@@ -1098,6 +1098,29 @@ def validate_regen_is_required(spec: Mapping[str, Any]) -> None:
         )
 
 
+def validate_notifications_config(notifications_cfg: Mapping[str, Any]) -> None:
+    enabled = bool(notifications_cfg.get("enabled", False))
+    hooks_cfg = notifications_cfg.get("hooks", [])
+    if not enabled:
+        return
+
+    if not isinstance(hooks_cfg, list) or not hooks_cfg:
+        raise ValueError(
+            "Notifications are enabled but no hooks are configured. "
+            "Please configure at least one Gmail hook."
+        )
+
+    for idx, hook in enumerate(hooks_cfg):
+        if not isinstance(hook, dict):
+            raise ValueError(f"`notifications.hooks[{idx}]` must be an object.")
+        hook_type = str(hook.get("type", "")).strip().lower()
+        if hook_type != "gmail":
+            raise ValueError(
+                "Only Gmail notifications are supported in online pipeline. "
+                f"Unsupported hook type at notifications.hooks[{idx}]: {hook_type or '<empty>'}"
+            )
+
+
 def append_tracking_args(cmd: List[str], tracking: Mapping[str, Any]) -> None:
     report_to = tracking.get("report_to")
     if report_to:
@@ -1435,6 +1458,9 @@ def main() -> int:
 
     NotificationManager, create_hooks = load_notify_api(repo_root)
     notifications_cfg = spec.get("notifications", {})
+    if not isinstance(notifications_cfg, dict):
+        raise ValueError("`notifications` must be an object.")
+    validate_notifications_config(notifications_cfg)
     hooks_cfg = notifications_cfg.get("hooks", [])
     manager = NotificationManager(create_hooks(hooks_cfg)) if hooks_cfg else None
 
@@ -1442,7 +1468,7 @@ def main() -> int:
         manager=manager,
         run_id=run_id,
         cooldown_sec=int(notifications_cfg.get("cooldown_sec", 600)),
-        enabled=bool(notifications_cfg.get("enabled", True)),
+        enabled=bool(notifications_cfg.get("enabled", False)),
     )
 
     machine_cfg = spec.get("machine", {})
