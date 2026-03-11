@@ -238,6 +238,7 @@ def initialize_dp_attention(
     enable_dp_attention = server_args.enable_dp_attention
     tp_size = server_args.tp_size
     dp_size = server_args.dp_size
+    attn_cp_size = getattr(server_args, "attn_cp_size", 1)
     moe_dense_tp_size = server_args.moe_dense_tp_size
     pp_size = server_args.pp_size
 
@@ -271,6 +272,40 @@ def initialize_dp_attention(
     mp_size = pp_size * tp_size
     group_ranks = []
 
+    attn_tp_size = max(1, tp_size // attn_cp_size // dp_attention._ATTN_DP_SIZE)
+
+    if attn_cp_size == tp_size:
+        parallel_state._ATTN_CP = tp_group
+    else:
+        attn_cp_group_ranks = []
+        for i in range(num_model_parallel_groups):
+            for dp_idx in range(dp_attention._ATTN_DP_SIZE):
+                for attn_tp_idx in range(attn_tp_size):
+                    st = (
+                        mp_size * i
+                        + dp_idx * attn_tp_size * attn_cp_size
+                        + attn_tp_idx
+                    )
+                    en = (
+                        mp_size * i
+                        + (dp_idx + 1) * attn_tp_size * attn_cp_size
+                        + attn_tp_idx
+                    )
+                    attn_cp_group_ranks.append(list(range(st, en, attn_tp_size)))
+        parallel_state._ATTN_CP = GroupCoordinator(
+            attn_cp_group_ranks,
+            tp_group.local_rank,
+            torch.distributed.get_backend(tp_group.device_group),
+            use_pynccl=False,
+            use_pymscclpp=False,
+            use_custom_allreduce=False,
+            use_torch_symm_mem_all_reduce=False,
+            use_hpu_communicator=False,
+            use_xpu_communicator=False,
+            use_npu_communicator=False,
+            group_name="attn_cp",
+        )
+
     for i in range(num_model_parallel_groups):
         ranks = [
             list(range(head, head + dp_attention._ATTN_TP_SIZE))
@@ -280,20 +315,23 @@ def initialize_dp_attention(
         ]
         group_ranks.extend(ranks)
 
-    dp_attention._ATTN_TP_GROUP = GroupCoordinator(
-        group_ranks,
-        tp_group.local_rank,
-        torch.distributed.get_backend(tp_group.device_group),
-        use_pynccl=SYNC_TOKEN_IDS_ACROSS_TP,
-        use_pymscclpp=False,
-        use_custom_allreduce=False,
-        use_torch_symm_mem_all_reduce=False,
-        use_hpu_communicator=False,
-        use_xpu_communicator=False,
-        use_npu_communicator=False,
-        group_name="attention_tp",
-    )
-    # print(f"{parallel_state._ATTN_TP_GROUP=}")
+    if dp_attention._ATTN_TP_SIZE == tp_size:
+        parallel_state._ATTN_TP = tp_group
+    else:
+        parallel_state._ATTN_TP = GroupCoordinator(
+            group_ranks,
+            tp_group.local_rank,
+            torch.distributed.get_backend(tp_group.device_group),
+            use_pynccl=SYNC_TOKEN_IDS_ACROSS_TP,
+            use_pymscclpp=False,
+            use_custom_allreduce=False,
+            use_torch_symm_mem_all_reduce=False,
+            use_hpu_communicator=False,
+            use_xpu_communicator=False,
+            use_npu_communicator=False,
+            group_name="attention_tp",
+        )
+    dp_attention._ATTN_TP_GROUP = parallel_state._ATTN_TP
 
     _DpGatheredBufferWrapper.set_metadata(
         hidden_size=model_config.hidden_size,
