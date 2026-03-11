@@ -1,0 +1,99 @@
+{
+  "run": {
+    "id": "qwen3_8b_online_example",
+    "output_dir": "./outputs/qwen3_8b_online_example",
+    "dry_run": false
+  },
+  "task": {
+    "algo": "eagle3"
+  },
+  "machine": {
+    "mode": "local",
+    "workspace": "."
+  },
+  "models": {
+    "target_model_path": "Qwen/Qwen3-8B",
+    "chat_template": "qwen",
+    "target_model_backend": "sglang",
+    "draft_model_config": null
+  },
+  "data": {
+    "source": {
+      "type": "built_in",
+      "dataset": "sharegpt"
+    },
+    "prepared_output_path": "./cache/dataset",
+    "regen": {
+      "enabled": true,
+      "model": "Qwen/Qwen3-8B",
+      "server_address": [
+        "localhost:30000"
+      ],
+      "concurrency": 64,
+      "max_tokens": 4096,
+      "temperature": 0.7,
+      "resume": true,
+      "output_file_path": "./outputs/qwen3_8b_online_example/data/sharegpt_train_regen.jsonl"
+    }
+  },
+  "parallel": {
+    "num_gpus": null,
+    "tp_size": null
+  },
+  "training": {
+    "torchrun_bin": "torchrun",
+    "num_epochs": 6,
+    "batch_size": 1,
+    "learning_rate": 0.0001,
+    "max_length": 4096,
+    "eval_interval": 2000,
+    "save_interval": 2000,
+    "log_interval": 50,
+    "build_dataset_num_proc": 32,
+    "resume": true,
+    "max_num_steps": null,
+    "additional_args": []
+  },
+  "tracking": {
+    "report_to": "none",
+    "wandb_project": null,
+    "wandb_name": null,
+    "wandb_key": null
+  },
+  "notifications": {
+    "enabled": true,
+    "cooldown_sec": 600,
+    "hooks": [
+      {
+        "type": "webhook",
+        "name": "ops_webhook",
+        "url": "https://example.com/hook",
+        "enabled": false,
+        "events": [
+          "RUN_STARTED",
+          "PARALLEL_PLAN_READY",
+          "STEP_STARTED",
+          "STEP_PROGRESS",
+          "STEP_COMPLETED",
+          "RUN_FAILED",
+          "RUN_COMPLETED"
+        ]
+      },
+      {
+        "type": "gmail",
+        "name": "gmail_alert",
+        "username": "your_bot@gmail.com",
+        "password_env": "SMTP_PASSWORD",
+        "from": "your_bot@gmail.com",
+        "to": [
+          "you@example.com"
+        ],
+        "enabled": false,
+        "events": [
+          "RUN_FAILED",
+          "RUN_COMPLETED"
+        ]
+      }
+    ]
+  }
+}

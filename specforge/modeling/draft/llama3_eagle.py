@@ -1400,7 +1400,16 @@ class LlamaForCausalLMEagle3(Eagle3DraftModel):
 
     def project_hidden_states(self, hidden_states: torch.Tensor) -> torch.Tensor:
         # eagle 3 requires hidden states from 3 layers
-        assert hidden_states.size(-1) == self.config.hidden_size * 3
+        target_hidden_size = getattr(self.config, "target_hidden_size", None)
+        expected_hidden_size = (
+            target_hidden_size
+            if target_hidden_size is not None
+            else self.config.hidden_size
+        )
+        assert hidden_states.size(-1) == expected_hidden_size * 3, (
+            f"Invalid hidden_states size: got {hidden_states.size(-1)}, "
+            f"expected {expected_hidden_size * 3} (3 * target_hidden_size)."
+        )
         return self.fc(hidden_states)
 
     def compute_logits(self, hidden_states: torch.Tensor) -> torch.Tensor:

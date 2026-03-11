@@ -1,0 +1,4 @@
+interface:
+  display_name: "SpecForge Parallel Planner"
+  short_description: "Auto-plan GPU parallel settings for online training"
+  default_prompt: "Generate a parallel plan for SpecForge online training by probing local or remote GPUs and output nproc_per_node, tp_size, dp_size, and rationale to parallel_plan.json."

@@ -154,6 +154,18 @@ def generate_draft_model_config(
                 value = str(value).replace("torch.", "")
             draft_config[draft_param] = value
 
+    # Persist target hidden size explicitly. This allows users to shrink
+    # draft hidden_size while keeping projection input aligned with target.
+    target_hidden_size = None
+    if hasattr(target_config, "hidden_size"):
+        target_hidden_size = target_config.hidden_size
+    elif hasattr(target_config, "text_config") and hasattr(
+        target_config.text_config, "hidden_size"
+    ):
+        target_hidden_size = target_config.text_config.hidden_size
+    if target_hidden_size is not None:
+        draft_config["target_hidden_size"] = target_hidden_size
+
     # Special handling for some parameters
     # Ensure num_hidden_layers is always 1 (EAGLE3 feature)
     draft_config["num_hidden_layers"] = 1

@@ -15,7 +15,7 @@ from torch.distributed.fsdp import MixedPrecision, ShardingStrategy, StateDictTy
 from torch.optim import Optimizer
 from torch.utils.data import DataLoader
 from tqdm import tqdm
-from transformers import AutoProcessor, AutoTokenizer
+from transformers import AutoConfig, AutoProcessor, AutoTokenizer
 
 from datasets import Dataset
 from specforge import (
@@ -378,6 +378,8 @@ def build_draft_model(args: Namespace) -> Tuple[AutoDraftModelConfig, nn.Module]
         # Use provided config file
         draft_model_config = AutoDraftModelConfig.from_file(args.draft_model_config)
 
+    validate_draft_config_alignment(args, draft_model_config)
+
     # Handle base ckpt, config file
     draft_model_last_checkpoint = None
     if args.ckpt_dir is not None:
@@ -414,6 +416,67 @@ def build_draft_model(args: Namespace) -> Tuple[AutoDraftModelConfig, nn.Module]
     draft_model.load_embedding(args.target_model_path, embedding_key=args.embedding_key)
     draft_model.freeze_embedding()
     return draft_model_config, draft_model
+
+
+def validate_draft_config_alignment(
+    args: Namespace, draft_model_config: AutoDraftModelConfig
+) -> None:
+    """
+    Validate hidden-size alignment between target and draft config.
+
+    For dense draft models we normally keep hidden_size aligned to target hidden_size.
+    If users intentionally shrink draft hidden_size, they must set `target_hidden_size`
+    so the projection layer can consume target hidden states safely.
+    """
+    target_config = AutoConfig.from_pretrained(
+        args.target_model_path,
+        trust_remote_code=args.trust_remote_code,
+        cache_dir=args.model_download_dir,
+    )
+    if hasattr(target_config, "text_config") and hasattr(
+        target_config.text_config, "hidden_size"
+    ):
+        target_hidden_size = target_config.text_config.hidden_size
+    elif hasattr(target_config, "hidden_size"):
+        target_hidden_size = target_config.hidden_size
+    else:
+        raise ValueError(
+            f"Cannot infer hidden_size from target config type: {type(target_config)}"
+        )
+
+    draft_hidden_size = getattr(draft_model_config, "hidden_size", None)
+    if draft_hidden_size is None:
+        raise ValueError("Draft config missing `hidden_size`.")
+
+    configured_target_hidden_size = getattr(
+        draft_model_config, "target_hidden_size", None
+    )
+
+    # Default/expected path for small dense draft models.
+    if draft_hidden_size == target_hidden_size:
+        print_on_rank0(
+            f"Draft/target hidden_size aligned at {target_hidden_size} (dense default)."
+        )
+        return
+
+    # Allow hidden-size mismatch only with an explicit target_hidden_size.
+    if configured_target_hidden_size is None:
+        raise ValueError(
+            "Draft hidden_size differs from target hidden_size, but `target_hidden_size` "
+            "is missing in draft config. For dense default, keep hidden_size aligned; "
+            "if intentionally using a smaller draft hidden size, set `target_hidden_size` "
+            "to the target model hidden size."
+        )
+
+    if configured_target_hidden_size != target_hidden_size:
+        raise ValueError(
+            f"Invalid `target_hidden_size` in draft config: got {configured_target_hidden_size}, "
+            f"expected {target_hidden_size}."
+        )
+
+    print_on_rank0(
+        f"Using reduced draft hidden_size={draft_hidden_size} with target_hidden_size={target_hidden_size}."
+    )
 
 
 def build_dataloaders(
