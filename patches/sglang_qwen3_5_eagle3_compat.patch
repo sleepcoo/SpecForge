@@ -1,0 +1,20 @@
+--- sglang/srt/models/qwen3_5.py
++++ sglang/srt/models/qwen3_5.py
+@@ -1048,6 +1048,19 @@
+         torch.cuda.empty_cache()
+         torch.cuda.synchronize()
+
++    def set_eagle3_layers_to_capture(self, layer_ids: Optional[list[int]] = None):
++        self.capture_aux_hidden_states = True
++        self.model.capture_aux_hidden_states = True
++        if layer_ids is None:
++            num_layers = self.config.num_hidden_layers
++            self.model.layers_to_capture = [
++                2,
++                num_layers // 2,
++                num_layers - 3,
++            ]  # Specific layers for EAGLE3 support
++        else:
++            self.model.layers_to_capture = [val + 1 for val in layer_ids]
++
+     def load_weights(self, weights: Iterable[Tuple[str, torch.Tensor]]):

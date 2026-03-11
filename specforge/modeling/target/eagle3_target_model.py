@@ -379,7 +379,14 @@ class SGLangEagle3TargetModel(Eagle3TargetModel):
         model_worker_batch = batch.get_model_worker_batch()
         forward_batch = ForwardBatch.init_new(model_worker_batch, self.model_runner)
         forward_batch.capture_hidden_mode = CaptureHiddenMode.FULL
-        eagle3_output, _ = self.model_runner.forward(forward_batch)
+        forward_out = self.model_runner.forward(forward_batch)
+        # SGLang API compatibility:
+        # - old: (eagle3_output, metadata)
+        # - newer: ModelRunnerOutput(logits_output=...)
+        if isinstance(forward_out, tuple):
+            eagle3_output = forward_out[0]
+        else:
+            eagle3_output = getattr(forward_out, "logits_output", forward_out)
 
         aux_hidden_states_list = None
         input_lens = [len(req.origin_input_ids) for req in reqs]

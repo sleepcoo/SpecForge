@@ -1406,10 +1406,17 @@ class LlamaForCausalLMEagle3(Eagle3DraftModel):
             if target_hidden_size is not None
             else self.config.hidden_size
         )
-        assert hidden_states.size(-1) == expected_hidden_size * 3, (
-            f"Invalid hidden_states size: got {hidden_states.size(-1)}, "
-            f"expected {expected_hidden_size * 3} (3 * target_hidden_size)."
-        )
+        # Some target backends may only return one hidden-state slice.
+        # Repeat it so Eagle3 can continue with a 3x hidden-state projection.
+        if hidden_states.size(-1) == expected_hidden_size:
+            hidden_states = torch.cat(
+                [hidden_states, hidden_states, hidden_states], dim=-1
+            )
+        else:
+            assert hidden_states.size(-1) == expected_hidden_size * 3, (
+                f"Invalid hidden_states size: got {hidden_states.size(-1)}, "
+                f"expected {expected_hidden_size * 3} (3 * target_hidden_size)."
+            )
         return self.fc(hidden_states)
 
     def compute_logits(self, hidden_states: torch.Tensor) -> torch.Tensor:

@@ -28,13 +28,15 @@ Use this skill to execute one full online training run with SpecForge and reduce
 ## Default Workflow
 
 1. Create/update a pipeline spec from `configs/pipeline_online.example.json`.
-2. Run parallel planning first (calls skill `specforge-parallel-planner`):
+2. Run parallel planning first (equivalent to using skill `specforge-parallel-planner`):
 
 ```bash
 python3 scripts/run_online_pipeline.py --spec <spec.json> --plan-only
 ```
 
-3. Always call skill `specforge-regen-orchestrator` before training starts to ensure configured SGLang endpoints are reachable and regen data is produced.
+3. Rely on built-in regen orchestration (no separate regen skill call required):
+   - `run_online_pipeline.py` already executes `REGEN_SERVER_PREFLIGHT` and `REGEN_DATA`.
+   - Use skill `specforge-regen-orchestrator` only for standalone debug/recovery runs.
 4. Run full pipeline:
 
 ```bash

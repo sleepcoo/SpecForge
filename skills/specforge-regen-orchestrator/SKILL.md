@@ -63,8 +63,8 @@ python3 scripts/regenerate_train_data.py \
 
 ## Integration
 
-- `specforge-online-trainer` should call this skill before every full pipeline execution.
-- This skill can also run as a standalone regen entrypoint for debug/recovery runs.
+- `specforge-online-trainer` already runs regen preflight and regen internally via `run_online_pipeline.py`.
+- Use this skill as a standalone regen entrypoint for debug/recovery runs.
 
 ## Guardrails
 

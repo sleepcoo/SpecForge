@@ -253,7 +253,8 @@ class CommandRunner:
             env_assign = " ".join(
                 f"{k}={shlex.quote(str(v))}" for k, v in self.extra_env.items()
             )
-            remote_cmd_parts.append(env_assign)
+            # Use export so env vars persist for subsequent commands in this shell.
+            remote_cmd_parts.append(f"export {env_assign}")
 
         remote_cmd_parts.append(self._join_cmd(command))
         remote_cmd = " && ".join(remote_cmd_parts)
