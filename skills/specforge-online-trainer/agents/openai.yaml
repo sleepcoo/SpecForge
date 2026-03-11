@@ -1,4 +1,4 @@
 interface:
   display_name: "SpecForge Online Trainer"
-  short_description: "One-command online training with regen, planning, and optional Gmail notifications"
-  default_prompt: "Run a full SpecForge online training pipeline using a spec file: prepare data, optional regen, automatic parallel planning, and start training (EAGLE3 or DFlash). Before execution, ask whether to enable Gmail notifications."
+  short_description: "Online training with regen, planning, and optional Gmail notifications in either inline or sequential shared-GPU mode"
+  default_prompt: "Run a full SpecForge online training workflow using a spec file. First decide whether regen and training should run in inline pipeline mode or sequential shared-GPU mode, then perform planning, regen, and training for EAGLE3 or DFlash. Before execution, ask whether to enable Gmail notifications."
